@@ -19,6 +19,7 @@ Abrir http://localhost:8765 (los módulos JS no funcionan abriendo el archivo co
 ## Pendiente / ideas
 - Probar con las dos cuentas reales.
 - Hecho v3: modo demo (botón "Ver la demo sin cuenta", datos de ejemplo, sessionStorage), mimos (kind hug, animación al recibir), eliminar iglú (rpc delete_my_couple), portada con saludo. Migración: supabase/002_mimos_y_borrar.sql (ya ejecutada).
-- Notificación diaria, más preguntas, "enviar un abrazo".
+- Hecho v4: menú de juegos (#juego/esto, #juego/quien, #juego/palabra). "¿Quién es más probable?" (kind likely, oculto hasta jugar los dos). "Palabra secreta" (kind word + wordplay, 6 fallos, el hielo se derrite). Migración supabase/003_juegos.sql (ya ejecutada).
+- Ideas: notificación diaria, más preguntas, estadísticas de juegos.
 
 Archivos: `index.html`, `styles.css`, `js/app.js` (pantallas), `js/store.js` (datos), `js/config.js`, `js/penguins.js` (dibujos), `js/content.js` (preguntas), `supabase/schema.sql`.

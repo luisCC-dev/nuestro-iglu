@@ -1,6 +1,6 @@
 import { store, dateKey, addDays, dayNumber } from './store.js';
 import { penguin, MOODS, moodById } from './penguins.js';
-import { QUESTIONS, THIS_OR_THAT, ROUND_SIZE, HUGS } from './content.js';
+import { QUESTIONS, THIS_OR_THAT, ROUND_SIZE, HUGS, LIKELY, LIKELY_SIZE } from './content.js';
 
 const root = document.getElementById('app');
 const TABS = [
@@ -364,7 +364,7 @@ function calendar() {
   </article>`;
 }
 
-function viewGame() {
+function gameTot() {
   const k = today(), me = ui.me, ot = other(me);
   const round = roundFor(k);
   const g = ui.data.games[k] || {};
@@ -411,9 +411,184 @@ function viewGame() {
     </article>`;
   }
 
-  return `<h1 class="page">Esto o aquello</h1>
+  return `${back()}<h1 class="page">Esto o aquello</h1>
     <p class="lead">Elige lo tuyo y adivina lo de ${name(ot)}. ¿Quién conoce mejor a quién?</p>
     ${body}`;
+}
+
+// ---------- juegos: menú ----------
+const back = () => `<a class="back" href="#juego">‹ Juegos</a>`;
+
+function seeded(key, salt) {
+  let seed = dayNumber(key) * 9301 + 49297 + salt * 7919;
+  return () => ((seed = (seed * 9301 + 49297) % 233280) / 233280);
+}
+function pickFor(key, arr, n, salt) {
+  const r = seeded(key, salt), idx = arr.map((_, i) => i);
+  for (let i = idx.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [idx[i], idx[j]] = [idx[j], idx[i]]; }
+  return idx.slice(0, n).map((i) => arr[i]);
+}
+
+function status(done, otherDone) {
+  const ot = name(other(ui.me));
+  if (!done) return ['todo', 'Te toca'];
+  if (!otherDone) return ['wait', `Esperando a ${ot}`];
+  return ['ok', 'Resultados listos'];
+}
+
+function viewGame() {
+  if (ui.sub === 'esto') return gameTot();
+  if (ui.sub === 'quien') return gameLikely();
+  if (ui.sub === 'palabra') return gameWord();
+  const k = today(), me = ui.me, ot = other(me);
+  const g = ui.data.games[k] || {}, l = ui.data.likely[k] || {};
+  const pw = partnerWord();
+  const myWord = ui.data.words[k]?.[me];
+  const wordSt = pw && !pw.play?.result ? ['todo', 'Tienes una palabra por adivinar']
+    : !myWord ? ['todo', `Pon una palabra a ${name(ot)}`]
+    : ui.data.wordplays[k]?.[ot]?.result ? ['ok', `${name(ot)} ya jugó tu palabra`]
+    : ['wait', `${name(ot)} está con tu palabra`];
+  const card = (href, art, title, desc, [cls, txt]) => `<a class="game-card" href="${href}">
+      <span class="art">${art}</span>
+      <span class="gtxt"><b>${title}</b><span>${desc}</span></span>
+      <span class="badge ${cls}">${txt}</span>
+    </a>`;
+  return `<h1 class="page">Juegos</h1>
+    <p class="lead">Un ratito cada día para conoceros mejor. Cada uno juega desde su móvil.</p>
+    <div class="games">
+      ${card('#juego/esto', '🍕<small>o</small>🍝', 'Esto o aquello', 'Elige y adivina lo que eligió tu pareja.', status(g[me], g[ot]))}
+      ${card('#juego/quien', penguin('a', 'emocionado', 44) + penguin('b', 'feliz', 44), '¿Quién es más probable?', 'Votad quién de los dos haría cada cosa.', status(l[me], l[ot]))}
+      ${card('#juego/palabra', '🧊', 'Palabra secreta', 'Pon una palabra y adivina la suya antes de que se derrita el hielo.', wordSt)}
+    </div>`;
+}
+
+// ---------- juego: ¿Quién es más probable? ----------
+function gameLikely() {
+  const k = today(), me = ui.me, ot = other(me);
+  const list = pickFor(k, LIKELY, LIKELY_SIZE, 3);
+  const l = ui.data.likely[k] || {};
+  let body;
+  if (!l[me]) {
+    const st = ui.lk || (ui.lk = { step: 0, picks: [] });
+    const dots = list.map((_, i) => `<span class="${i < st.step ? 'on' : ''}"></span>`).join('');
+    body = `<article class="card center">
+      <div class="progress">${dots}</div>
+      <div class="label">¿Quién es más probable que…</div>
+      <p class="question" style="margin-bottom:18px">…${esc(list[st.step])}?</p>
+      <div class="choices">
+        <button class="choice" data-action="lk-pick" data-who="${me}">${penguin(me, 'feliz', 72)}Yo</button>
+        <button class="choice" data-action="lk-pick" data-who="${ot}">${penguin(ot, 'feliz', 72)}${name(ot)}</button>
+      </div>
+      <p class="hint">${st.step + 1} de ${list.length}</p>
+    </article>`;
+  } else if (!l[ot]) {
+    body = `<article class="card center">${penguin(ot, 'cansado', 96).replace('class="penguin', 'style="margin:0 auto" class="penguin')}
+      <h2>¡Votado!</h2><p class="hint">Cuando ${name(ot)} vote veréis en qué coincidís.</p></article>`;
+  } else {
+    const same = list.filter((_, i) => l[me].picks[i] === l[ot].picks[i]).length;
+    const mini = (w) => penguin(w, null, 30);
+    body = `<article class="card">
+      <div class="center"><div class="duo-inline">${penguin('a', same >= 3 ? 'amor' : 'feliz', 64)}${penguin('b', same >= 3 ? 'amor' : 'feliz', 64)}</div>
+      <p class="question" style="margin:6px 0 2px">Coincidís en ${same} de ${list.length}</p>
+      <p class="hint mt0">${same === list.length ? '¡Telepatía de pingüinos!' : same >= 3 ? 'Os conocéis muy bien.' : 'Hay cosas que comentar…'}</p></div>
+      <div class="row space" style="margin-top:12px;font-size:13px;color:var(--muted);font-weight:800"><span>Tú dijiste</span><span>${name(ot)} dijo</span></div>
+      ${list.map((t, i) => {
+        const ok = l[me].picks[i] === l[ot].picks[i];
+        return `<div class="lk-row"><div class="lk-t">…${esc(t)}</div>
+          <div class="lk-v">${mini(l[me].picks[i])}<span class="tag ${ok ? 'ok' : 'no'}">${ok ? 'Coincidís' : 'No'}</span>${mini(l[ot].picks[i])}</div></div>`;
+      }).join('')}
+      <p class="hint center">Mañana hay preguntas nuevas.</p>
+    </article>`;
+  }
+  return `${back()}<h1 class="page">¿Quién es más probable?</h1>
+    <p class="lead">Vota quién de los dos haría cada cosa. Lo de ${name(ot)} se ve cuando votéis los dos.</p>${body}`;
+}
+
+// ---------- juego: Palabra secreta ----------
+const MAX_WRONG = 6;
+function normWord(w) {
+  return w.toUpperCase().replace(/Ñ/g, '\u0001').normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/\u0001/g, 'Ñ').replace(/\s+/g, ' ').trim();
+}
+function wordState(word, guessed = '') {
+  const letters = [...new Set(word.replace(/ /g, ''))];
+  const wrong = [...guessed].filter((c) => !word.includes(c)).length;
+  const solved = letters.every((c) => guessed.includes(c));
+  return { wrong, solved, lost: wrong >= MAX_WRONG };
+}
+// La palabra de la pareja que toca jugar: la de hoy, o una de los 2 días anteriores sin terminar.
+function partnerWord() {
+  const ot = other(ui.me);
+  for (let i = 0; i < 3; i++) {
+    const d = addDays(today(), -i), w = ui.data.words[d]?.[ot];
+    if (!w) continue;
+    const play = ui.data.wordplays[d]?.[ui.me];
+    if (i === 0 || !play?.result) return { day: d, ...w, play };
+  }
+  return null;
+}
+function masked(word, guessed, reveal = false) {
+  return `<div class="word">${[...word].map((c) => c === ' ' ? '<span class="gap"></span>'
+    : `<span class="lt ${guessed.includes(c) ? 'on' : reveal ? 'miss' : ''}">${guessed.includes(c) || reveal ? c : ''}</span>`).join('')}</div>`;
+}
+function meltScene(who, wrong, result) {
+  const w = Math.max(46, 220 - wrong * 30);
+  const mood = result === 'win' ? 'feliz' : result === 'lose' ? 'triste' : wrong >= 4 ? 'triste' : wrong >= 2 ? 'cansado' : null;
+  return `<div class="melt ${result || ''}">
+    <div class="sun"></div>
+    <div class="pg">${penguin(who, mood, 72)}</div>
+    <div class="floe2" style="width:${w}px"></div>
+    <div class="water"></div>
+    ${result === 'lose' ? '<span class="splash">💦</span>' : ''}
+    <span class="lives">${'🧊'.repeat(MAX_WRONG - wrong)}${'💧'.repeat(Math.min(wrong, MAX_WRONG))}</span>
+  </div>`;
+}
+
+function gameWord() {
+  const k = today(), me = ui.me, ot = other(me);
+  const pw = partnerWord();
+  let play;
+  if (!pw) {
+    play = `<div class="locked">${penguin(ot, 'cansado', 52)}<p>${name(ot)} todavía no te ha puesto una palabra hoy.</p></div>`;
+  } else {
+    const guessed = pw.play?.guessed || '';
+    const st = wordState(pw.word, guessed);
+    const result = pw.play?.result || null;
+    const rows = ['QWERTYUIOP', 'ASDFGHJKLÑ', 'ZXCVBNM'];
+    const kb = result ? '' : `<div class="kb">${rows.map((r) => `<div class="kb-row">${[...r].map((c) => {
+      const used = guessed.includes(c), cls = used ? (pw.word.includes(c) ? 'ok' : 'no') : '';
+      return `<button class="key ${cls}" data-action="letter" data-l="${c}" ${used ? 'disabled' : ''} aria-label="Letra ${c}">${c}</button>`;
+    }).join('')}</div>`).join('')}</div>`;
+    play = `${meltScene(me, st.wrong, result)}
+      ${pw.clue ? `<p class="clue">Pista: <b>${esc(pw.clue)}</b></p>` : ''}
+      ${masked(pw.word, guessed, result === 'lose')}
+      ${result === 'win' ? `<p class="question center" style="margin:10px 0 0">¡Salvaste a tu pingüino! 🎉</p>` : ''}
+      ${result === 'lose' ? `<p class="question center" style="margin:10px 0 0">¡Al agua! La palabra era ${esc(pw.word)}</p>` : ''}
+      ${kb}`;
+  }
+
+  const mine = ui.data.words[k]?.[me];
+  let set;
+  if (!mine) {
+    set = `<form data-form="word">
+      <div class="field"><label for="ww">Palabra o frase corta</label><input id="ww" name="word" required maxlength="20" autocomplete="off" placeholder="Ej.: chocolate"></div>
+      <div class="field"><label for="wc">Pista (opcional)</label><input id="wc" name="clue" maxlength="40" autocomplete="off" placeholder="Ej.: lo que me robas siempre"></div>
+      <button class="btn" type="submit">Enviar palabra a ${name(ot)}</button>
+      <p class="hint">Solo letras y espacios. Las tildes no cuentan.</p>
+    </form>`;
+  } else {
+    const op = ui.data.wordplays[k]?.[ot];
+    const st = wordState(mine.word, op?.guessed || '');
+    set = `<p class="mt0">Tu palabra de hoy: <b>${esc(mine.word)}</b>${mine.clue ? ` · pista: ${esc(mine.clue)}` : ''}</p>
+      ${!op ? `<p class="hint">${name(ot)} aún no ha empezado.</p>`
+        : `${masked(mine.word, op.guessed || '')}
+           <p class="hint">${op.result === 'win' ? `🎉 ${name(ot)} la adivinó con ${st.wrong} fallos.` : op.result === 'lose' ? `💦 ${name(ot)} no la adivinó.` : `${name(ot)} lleva ${st.wrong} de ${MAX_WRONG} fallos.`}</p>`}`;
+  }
+
+  return `${back()}<h1 class="page">Palabra secreta</h1>
+    <p class="lead">Adivina la palabra de ${name(ot)} antes de que se derrita el hielo. Cada fallo derrite un trozo.</p>
+    <article class="card"><h2>La palabra de ${name(ot)}</h2>${play}</article>
+    <article class="card"><h2>Tu palabra para ${name(ot)}</h2>${set}</article>`;
 }
 
 function viewUs() {
@@ -501,7 +676,8 @@ async function render() {
   ui.data = await store.getAll();
   if (!ui.data.names) { root.innerHTML = viewSetup(); return; }
   if (store.cloud && !subscribed) { subscribed = true; store.onRemoteChange(() => { if (!document.activeElement?.matches('textarea, input')) render(); }); }
-  const view = (location.hash.slice(1) || 'hoy');
+  const [view, sub] = (location.hash.slice(1) || 'hoy').split('/');
+  ui.sub = sub;
   const views = { hoy: viewToday, diario: viewDiary, juego: viewGame, nosotros: viewUs };
   const fn = views[view] || viewToday;
   root.innerHTML = header() + `<main>${fn()}</main>` + tabs(views[view] ? view : 'hoy');
@@ -532,6 +708,11 @@ root.addEventListener('submit', async (e) => {
       await store.joinCouple(fd.get('code').trim(), fd.get('name').trim());
       ui.status = null;
       toast('¡Ya estáis los dos en el iglú! 🐧🐧');
+    } else if (kind === 'word') {
+      const word = normWord(fd.get('word') || '');
+      if (!/^[A-ZÑ ]{2,20}$/.test(word) || word.replace(/ /g, '').length < 2) { toast('Usa solo letras (mínimo 2).'); if (btn) btn.disabled = false; return; }
+      await store.save('word', today(), ui.me, { word, clue: (fd.get('clue') || '').trim() });
+      toast(`Palabra enviada a ${name(other(ui.me))} 🧊`);
     } else if (kind === 'hug') {
       const k = today(), list = [...(ui.data.hugs?.[k]?.[ui.me]?.items || [])];
       const type = ui.hugPick;
@@ -596,6 +777,24 @@ root.addEventListener('click', async (e) => {
     const dt = new Date(y, m - 1 + (a === 'cal-next' ? 1 : -1), 1);
     ui.calMonth = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}`;
   }
+  if (a === 'lk-pick') {
+    const k = today(), st = ui.lk;
+    st.picks[st.step] = el.dataset.who; st.step++;
+    if (st.step >= LIKELY_SIZE) {
+      try { await store.save('likely', k, ui.me, { picks: st.picks }); ui.lk = null; toast('¡Votado!'); }
+      catch (err) { st.step--; toast(errText(err)); }
+    }
+  }
+  if (a === 'letter') {
+    const pw = partnerWord();
+    if (!pw || pw.play?.result) return;
+    const guessed = (pw.play?.guessed || '') + el.dataset.l;
+    const st = wordState(pw.word, guessed);
+    const result = st.solved ? 'win' : st.lost ? 'lose' : null;
+    try { await store.save('wordplay', pw.day, ui.me, { guessed, result }); }
+    catch (err) { toast(errText(err)); return; }
+    if (result === 'win') toast('¡Adivinada! 🎉');
+  }
   if (a === 'choose') {
     const s = ui.game, i = Number(el.dataset.i);
     if (s.phase === 'pick') { s.picks[s.step] = i; s.phase = 'guess'; }
@@ -614,7 +813,7 @@ root.addEventListener('click', async (e) => {
   render();
 });
 
-window.addEventListener('hashchange', () => { ui.editMood = false; ui.draftMood = null; render(); window.scrollTo(0, 0); });
+window.addEventListener('hashchange', () => { ui.editMood = false; ui.draftMood = null; ui.lk = null; render(); window.scrollTo(0, 0); });
 // Al volver a la app (por ejemplo, tras días en segundo plano) refrescar el día y los datos.
 document.addEventListener('visibilitychange', () => { if (!document.hidden && ui.data) render(); });
 render();

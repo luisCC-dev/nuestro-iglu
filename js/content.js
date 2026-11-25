@@ -84,3 +84,38 @@ export const HUGS = [
   ['baile', '💃', 'Bailamos', 'te saca a bailar'],
   ['cosquillas', '😆', 'Cosquillas', 'te hace cosquillas'],
 ];
+
+// "¿Quién es más probable…?" — cada uno responde "yo" o "mi pareja"
+export const LIKELY = [
+  'quedarse dormido viendo una peli',
+  'perderse aunque lleve el GPS',
+  'comerse el último trozo sin preguntar',
+  'llorar con un anuncio',
+  'llegar tarde a una cita',
+  'adoptar un animal sin avisar',
+  'hablar con las plantas',
+  'ganar en un juego de mesa',
+  'olvidar dónde dejó las llaves',
+  'empezar una pelea de cosquillas',
+  'cantar en la ducha a todo volumen',
+  'planear un viaje sorpresa',
+  'reírse en un momento serio',
+  'comprar algo que no necesita',
+  'saludar a todos los perros de la calle',
+  'quemar la cena',
+  'mandar un audio de cinco minutos',
+  'pedir perdón primero',
+  'ver una serie entera en un fin de semana',
+  'hacer amigos en la cola del súper',
+  'despertarse de mal humor',
+  'guardar los tickets "por si acaso"',
+  'acordarse de un aniversario',
+  'tener miedo en una peli de terror',
+  'robar la manta por la noche',
+  'apuntarse al gimnasio y no ir',
+  'bailar en la cocina',
+  'decir "cinco minutos más" por la mañana',
+  'hacer una foto a la comida',
+  'proponer un plan improvisado a las 11 de la noche',
+];
+export const LIKELY_SIZE = 5;

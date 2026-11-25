@@ -228,3 +228,48 @@ main { animation: fadeUp .25s ease-out; }
 }
 .couple span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 120px; }
 .top .chip { white-space: nowrap; padding: 8px 10px; }
+
+/* ---------- v4: juegos ---------- */
+.back { display: inline-block; margin: 0 0 2px; font-weight: 800; color: var(--navy); text-decoration: none; padding: 6px 0; }
+.games { display: grid; gap: 12px; }
+.game-card { display: grid; grid-template-columns: 76px 1fr; grid-template-rows: auto auto; gap: 4px 14px; align-items: center; background: var(--card); border-radius: var(--radius); padding: 14px; box-shadow: var(--shadow); color: inherit; text-decoration: none; transition: transform .12s; }
+.game-card:active { transform: translateY(2px); }
+.game-card .art { grid-row: span 2; width: 76px; height: 76px; border-radius: 18px; background: linear-gradient(160deg, #e3f0ff, #fff6e6); display: flex; align-items: center; justify-content: center; font-size: 34px; }
+.game-card .art small { font-size: 12px; font-weight: 800; color: var(--muted); margin: 0 2px; }
+.game-card .art .penguin { width: 38px; height: 38px; }
+.game-card .art .penguin + .penguin { margin-left: -8px; }
+.game-card .gtxt b { display: block; font-size: 17px; }
+.game-card .gtxt span { display: block; font-size: 14px; color: var(--muted); font-weight: 600; }
+.badge { justify-self: start; font-size: 12px; font-weight: 800; padding: 3px 10px; border-radius: 999px; }
+.badge.todo { background: #ffe1d8; color: #b14a2e; }
+.badge.wait { background: #e3f0ff; color: var(--navy); }
+.badge.ok { background: #dff3e6; color: #2f7d50; }
+
+.duo-inline { display: flex; justify-content: center; }
+.duo-inline .penguin + .penguin { margin-left: -12px; }
+.lk-row { padding: 10px 0; border-top: 1px solid var(--line); }
+.lk-t { font-weight: 700; font-size: 15px; margin-bottom: 6px; }
+.lk-v { display: flex; align-items: center; justify-content: space-between; }
+
+.melt { position: relative; height: 170px; border-radius: 18px; overflow: hidden; background: linear-gradient(180deg, #bfe3ff 0%, #e8f5ff 100%); margin-bottom: 12px; }
+.melt .sun { position: absolute; right: 18px; top: 14px; width: 34px; height: 34px; border-radius: 50%; background: #ffd66b; box-shadow: 0 0 0 8px rgba(255,214,107,.25); }
+.melt .water { position: absolute; left: 0; right: 0; bottom: 0; height: 46px; background: linear-gradient(180deg, #78bdf6, #4f9de6); }
+.melt .floe2 { position: absolute; left: 50%; bottom: 34px; translate: -50% 0; height: 24px; border-radius: 50%; background: linear-gradient(180deg, #fff 0 50%, #d7ecff 50% 100%); transition: width .5s ease; z-index: 1; }
+.melt .pg { position: absolute; left: 50%; bottom: 48px; translate: -50% 0; z-index: 2; transition: bottom .8s ease-in, opacity .8s; }
+.melt.lose .pg { bottom: -10px; opacity: .8; }
+.melt.win .pg { animation: jumpA 1s ease-in-out infinite; }
+.melt .splash { position: absolute; left: 50%; bottom: 30px; translate: -50% 0; font-size: 30px; z-index: 3; }
+.melt .lives { position: absolute; left: 10px; top: 10px; font-size: 14px; letter-spacing: 1px; background: rgba(255,255,255,.75); border-radius: 999px; padding: 3px 8px; }
+.clue { margin: 0 0 10px; color: #3d4d63; }
+.word { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin: 6px 0 12px; }
+.word .lt { width: 30px; height: 38px; border-radius: 10px; background: var(--soft); border-bottom: 3px solid #d6cfbf; display: grid; place-items: center; font-weight: 900; font-size: 20px; }
+.word .lt.on { background: #fff; border-color: var(--navy); }
+.word .lt.miss { color: #b14a2e; }
+.word .gap { width: 14px; }
+.kb { display: grid; gap: 6px; }
+.kb-row { display: flex; gap: 4px; justify-content: center; }
+.key { flex: 1; max-width: 34px; min-height: 44px; border: 0; border-radius: 10px; background: #fff; box-shadow: 0 3px 0 #e4ddcf; font-weight: 800; font-size: 16px; padding: 0; }
+.key:active { transform: translateY(2px); box-shadow: 0 1px 0 #e4ddcf; }
+.key.ok { background: #bfe6c9; box-shadow: none; }
+.key.no { background: #f3d6cf; color: #9a5446; box-shadow: none; }
+.key:disabled { cursor: default; }

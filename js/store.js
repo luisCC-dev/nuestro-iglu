@@ -6,13 +6,13 @@ import { SUPABASE_URL, SUPABASE_KEY } from './config.js';
 // Modo demo: datos de ejemplo en este dispositivo, sin cuenta (?demo o botón "Ver demo").
 const DEMO = sessionStorage.getItem('iglu-demo') === '1';
 const CLOUD = !!SUPABASE_KEY && !DEMO;
-const SECTION = { answer: 'answers', mood: 'moods', game: 'games', hug: 'hugs' };
+const SECTION = { answer: 'answers', mood: 'moods', game: 'games', hug: 'hugs', likely: 'likely', word: 'words', wordplay: 'wordplays' };
 let sb = null;
 let member = null; // { slot, couple_id, name } en modo cloud
 
 // ---------- modo local ----------
 const KEY = DEMO ? 'iglu-demo-v1' : 'iglu-data-v1', ME_KEY = DEMO ? 'iglu-demo-me' : 'iglu-me';
-const empty = () => ({ names: null, answers: {}, moods: {}, games: {}, hugs: {} });
+const empty = () => ({ names: null, answers: {}, moods: {}, games: {}, hugs: {}, likely: {}, words: {}, wordplays: {} });
 function loadLocal() { try { return { ...empty(), ...JSON.parse(localStorage.getItem(KEY)) }; } catch { return empty(); } }
 function putLocal(kind, date, who, value) {
   const d = loadLocal(), s = SECTION[kind];
@@ -72,6 +72,7 @@ export const store = {
   async setNames(a, b) { const d = loadLocal(); d.names = { a, b }; localStorage.setItem(KEY, JSON.stringify(d)); },
   async saveAnswer(date, who, text) { CLOUD ? await putCloud('answer', date, { text }) : putLocal('answer', date, who, { text }); },
   async saveMood(date, who, mood, note) { CLOUD ? await putCloud('mood', date, { mood, note }) : putLocal('mood', date, who, { mood, note }); },
+  async save(kind, date, who, data) { CLOUD ? await putCloud(kind, date, data) : putLocal(kind, date, who, data); },
   async saveHugs(date, who, items) { CLOUD ? await putCloud('hug', date, { items }) : putLocal('hug', date, who, { items }); },
   async saveGame(date, who, picks, guesses) { CLOUD ? await putCloud('game', date, { picks, guesses }) : putLocal('game', date, who, { picks, guesses }); },
   async reset() { localStorage.removeItem(KEY); localStorage.removeItem(ME_KEY); },
@@ -119,6 +120,8 @@ function seedDemo() {
   d.answers[t] = { b: { text: 'Que me hagas reír aunque esté cansada', at: Date.now() } };
   d.moods[t] = { b: { mood: 'amor', note: 'Día largo, pero con ganas de verte.', at: Date.now() } };
   d.hugs[t] = { b: { items: [{ type: 'abrazo', msg: '¡Buenos días, pingüino!', at: Date.now() - 3600000 }], at: Date.now() } };
+  d.likely[t] = { b: { picks: ['a', 'b', 'a', 'a', 'b'], at: Date.now() } };
+  d.words[t] = { b: { word: 'CHOCOLATE', clue: 'Lo que siempre me robas', at: Date.now() } };
   localStorage.setItem(KEY, JSON.stringify(d));
   localStorage.setItem(ME_KEY, 'a');
 }
