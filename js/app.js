@@ -77,10 +77,56 @@ function header() {
       <div class="avatars">${penguin('a', null, 40)}${penguin('b', null, 40)}</div>
       <span>${name('a')} & ${name('b')}</span>
     </div>
-    <button class="chip" data-action="switch-me" title="Modo prueba: cambia quién usa este móvil">
+    ${store.cloud ? '' : `<button class="chip" data-action="switch-me" title="Modo prueba: cambia quién usa este móvil">
       <small>Eres</small> ${name(me)} ⇄
-    </button>
+    </button>`}
   </header>`;
+}
+
+function intro() {
+  return `<h1 class="page">Nuestro Iglú</h1>
+    <p class="lead">Un rincón para los dos: una pregunta al día, cómo os sentís y juegos.</p>
+    <div class="pair">${penguin('a', 'feliz', 120, 'bob')}${penguin('b', 'amor', 120, 'bob')}</div>`;
+}
+
+function viewAuth() {
+  const signup = ui.authMode === 'signup';
+  return `<section class="setup">${intro()}
+    <form class="card" data-form="auth">
+      <h2>${signup ? 'Crear cuenta' : 'Entrar'}</h2>
+      <div class="field"><label for="em">Email</label><input id="em" name="email" type="email" required autocomplete="email"></div>
+      <div class="field"><label for="pw">Contraseña</label><input id="pw" name="password" type="password" required minlength="6" autocomplete="${signup ? 'new-password' : 'current-password'}"></div>
+      <button class="btn" type="submit">${signup ? 'Crear cuenta' : 'Entrar'}</button>
+      <button class="btn secondary" type="button" data-action="auth-toggle">${signup ? 'Ya tengo cuenta' : 'Soy nuevo: crear cuenta'}</button>
+    </form>
+  </section>`;
+}
+
+function viewCouple() {
+  return `<section class="setup">${intro()}
+    <form class="card" data-form="create">
+      <h2>Crear nuestro iglú</h2>
+      <p class="hint mt0">Para el primero de los dos. Te daremos un código para tu pareja.</p>
+      <div class="field"><label for="cn">Tu nombre</label><input id="cn" name="name" required maxlength="20" autocomplete="given-name"></div>
+      <button class="btn" type="submit">Crear y ver el código</button>
+    </form>
+    <form class="card" data-form="join">
+      <h2>Tengo un código</h2>
+      <div class="field"><label for="jc">Código de tu pareja</label><input id="jc" name="code" required maxlength="6" autocomplete="off" style="text-transform:uppercase;letter-spacing:.2em"></div>
+      <div class="field"><label for="jn">Tu nombre</label><input id="jn" name="name" required maxlength="20" autocomplete="given-name"></div>
+      <button class="btn" type="submit">Unirme</button>
+    </form>
+    <button class="btn secondary" data-action="signout">Salir</button>
+  </section>`;
+}
+
+function codeCard() {
+  if (!store.cloud || ui.data.full) return '';
+  return `<article class="card center">
+    <div class="label">Invita a tu pareja</div>
+    <p class="question" style="letter-spacing:.25em;margin:4px 0">${esc(ui.data.code || '')}</p>
+    <p class="hint mt0">Que abra la app, cree su cuenta y escriba este código en “Tengo un código”.</p>
+  </article>`;
 }
 
 function tabs(view) {
@@ -134,7 +180,7 @@ function viewToday() {
       ${['a', 'b'].map((w) => `<div class="answer">${penguin(w, null, 34)}<div class="bubble"><b>${name(w)}</b><p>${esc(pa[w].text)}</p></div></div>`).join('')}</details>`);
   }
 
-  return `<h1 class="page">Pregunta del día</h1>
+  return `${codeCard()}<h1 class="page">Pregunta del día</h1>
     <p class="lead">${fmtDate(k)} · 🔥 ${streak()} ${streak() === 1 ? 'día' : 'días'} de racha</p>
     <article class="card">
       <div class="label">Hoy</div>
@@ -320,15 +366,38 @@ function viewUs() {
     </article>
     <article class="card">
       <h2>Ajustes</h2>
-      <p class="hint mt0">Modo prueba: los datos se guardan solo en este dispositivo. Usa el botón “Eres …” de arriba para cambiar de persona.</p>
-      <button class="btn secondary" data-action="reset">Borrar todo y empezar de nuevo</button>
+      ${store.cloud
+        ? `<p class="hint mt0">Vuestros datos se guardan en vuestra base de datos privada y solo los veis vosotros dos.</p>
+           <button class="btn secondary" data-action="signout">Cerrar sesión</button>`
+        : `<p class="hint mt0">Modo prueba: los datos se guardan solo en este dispositivo. Usa el botón “Eres …” de arriba para cambiar de persona.</p>
+           <button class="btn secondary" data-action="reset">Borrar todo y empezar de nuevo</button>`}
     </article>`;
 }
 
 // ---------- render ----------
+const ERRORS = {
+  'Invalid login credentials': 'Email o contraseña incorrectos.',
+  'Email not confirmed': 'Primero confirma tu email: mira tu correo.',
+  'User already registered': 'Ese email ya tiene cuenta. Pulsa “Ya tengo cuenta”.',
+  'bad code': 'Ese código no existe. Revísalo.',
+  'couple full': 'Ese iglú ya tiene a sus dos pingüinos.',
+  'already in a couple': 'Ya estás en un iglú.',
+};
+const errText = (err) => {
+  const m = err?.message || String(err);
+  const k = Object.keys(ERRORS).find((x) => m.includes(x));
+  return k ? ERRORS[k] : 'Algo falló: ' + m;
+};
+
+let subscribed = false;
 async function render() {
+  if (!ui.status) ui.status = await store.init();
+  if (ui.status === 'signed-out') { root.innerHTML = viewAuth(); return; }
+  if (ui.status === 'no-couple') { root.innerHTML = viewCouple(); return; }
+  ui.me = store.getMe();
   ui.data = await store.getAll();
   if (!ui.data.names) { root.innerHTML = viewSetup(); return; }
+  if (store.cloud && !subscribed) { subscribed = true; store.onRemoteChange(() => { if (!document.activeElement?.matches('textarea, input')) render(); }); }
   const view = (location.hash.slice(1) || 'hoy');
   const views = { hoy: viewToday, diario: viewDiary, juego: viewGame, nosotros: viewUs };
   const fn = views[view] || viewToday;
@@ -339,20 +408,42 @@ async function render() {
 root.addEventListener('submit', async (e) => {
   e.preventDefault();
   const f = e.target, kind = f.dataset.form, fd = new FormData(f);
-  if (kind === 'setup') {
-    await store.setNames(fd.get('a').trim(), fd.get('b').trim());
-    store.setMe('a'); ui.me = 'a';
-  } else if (kind === 'answer') {
-    const text = fd.get('text').trim();
-    if (!text) return;
-    await store.saveAnswer(today(), ui.me, text);
-    toast('Respuesta guardada 🐧');
-  } else if (kind === 'mood') {
-    const mood = ui.draftMood ?? ui.data.moods[today()]?.[ui.me]?.mood;
-    if (!mood) return;
-    await store.saveMood(today(), ui.me, mood, fd.get('note').trim());
-    ui.editMood = false; ui.draftMood = null;
-    toast('Día guardado');
+  const btn = f.querySelector('button[type=submit]');
+  if (btn) btn.disabled = true;
+  try {
+    if (kind === 'setup') {
+      await store.setNames(fd.get('a').trim(), fd.get('b').trim());
+      store.setMe('a'); ui.me = 'a';
+    } else if (kind === 'auth') {
+      const email = fd.get('email').trim(), pw = fd.get('password');
+      if (ui.authMode === 'signup') {
+        const ok = await store.signUp(email, pw);
+        if (!ok) { toast('Te hemos enviado un email: confírmalo y luego entra.'); ui.authMode = 'signin'; }
+      } else await store.signIn(email, pw);
+      ui.status = null;
+    } else if (kind === 'create') {
+      await store.createCouple(fd.get('name').trim());
+      ui.status = null;
+    } else if (kind === 'join') {
+      await store.joinCouple(fd.get('code').trim(), fd.get('name').trim());
+      ui.status = null;
+      toast('¡Ya estáis los dos en el iglú! 🐧🐧');
+    } else if (kind === 'answer') {
+      const text = fd.get('text').trim();
+      if (!text) return;
+      await store.saveAnswer(today(), ui.me, text);
+      toast('Respuesta guardada 🐧');
+    } else if (kind === 'mood') {
+      const mood = ui.draftMood ?? ui.data.moods[today()]?.[ui.me]?.mood;
+      if (!mood) return;
+      await store.saveMood(today(), ui.me, mood, fd.get('note').trim());
+      ui.editMood = false; ui.draftMood = null;
+      toast('Día guardado');
+    }
+  } catch (err) {
+    toast(errText(err));
+    if (btn) btn.disabled = false;
+    return;
   }
   render();
 });
@@ -368,6 +459,8 @@ root.addEventListener('click', async (e) => {
     toast(`Ahora eres ${name(ui.me)} (modo prueba)`);
     return;
   }
+  if (a === 'auth-toggle') ui.authMode = ui.authMode === 'signup' ? 'signin' : 'signup';
+  if (a === 'signout') { await store.signOut(); ui.status = null; location.hash = ''; }
   if (a === 'pick-mood') {
     ui.draftMood = el.dataset.mood;
     const note = root.querySelector('textarea[name="note"]')?.value;
@@ -389,9 +482,8 @@ root.addEventListener('click', async (e) => {
     else {
       s.guesses[s.step] = i; s.step++; s.phase = 'pick';
       if (s.step >= ROUND_SIZE) {
-        await store.saveGame(today(), ui.me, s.picks, s.guesses);
-        ui.game = null;
-        toast('¡Ronda terminada!');
+        try { await store.saveGame(today(), ui.me, s.picks, s.guesses); ui.game = null; toast('¡Ronda terminada!'); }
+        catch (err) { s.step--; s.phase = 'guess'; toast(errText(err)); }
       }
     }
   }
@@ -403,4 +495,6 @@ root.addEventListener('click', async (e) => {
 });
 
 window.addEventListener('hashchange', () => { ui.editMood = false; ui.draftMood = null; render(); window.scrollTo(0, 0); });
+// Al volver a la app (por ejemplo, tras días en segundo plano) refrescar el día y los datos.
+document.addEventListener('visibilitychange', () => { if (!document.hidden && ui.data) render(); });
 render();
