@@ -1,0 +1,9 @@
+{
+  "name": "Nuestro Iglú",
+  "short_name": "Iglú",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#dceeff",
+  "theme_color": "#bfe0ff",
+  "icons": [{ "src": "icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+}
