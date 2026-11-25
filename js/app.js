@@ -1,6 +1,6 @@
 import { store, dateKey, addDays, dayNumber } from './store.js';
 import { penguin, MOODS, moodById } from './penguins.js';
-import { QUESTIONS, THIS_OR_THAT, ROUND_SIZE } from './content.js';
+import { QUESTIONS, THIS_OR_THAT, ROUND_SIZE, HUGS } from './content.js';
 
 const root = document.getElementById('app');
 const TABS = [
@@ -25,6 +25,7 @@ const esc = (s = '') => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<
 const other = (w) => (w === 'a' ? 'b' : 'a');
 const name = (w) => esc(ui.data.names?.[w] || (w === 'a' ? 'Tú' : 'Tu pareja'));
 const today = () => dateKey();
+const cap = (t) => t.charAt(0).toUpperCase() + t.slice(1);
 const fmtDate = (key, opts = { weekday: 'long', day: 'numeric', month: 'long' }) => {
   const [y, m, d] = key.split('-').map(Number);
   return new Date(y, m - 1, d).toLocaleDateString('es-ES', opts);
@@ -77,9 +78,10 @@ function header() {
       <div class="avatars">${penguin('a', null, 40)}${penguin('b', null, 40)}</div>
       <span>${name('a')} & ${name('b')}</span>
     </div>
+    <div class="row" style="gap:6px">${store.demo ? '<button class="chip demo" data-action="exit-demo" aria-label="Salir de la demo">Demo ✕</button>' : ''}
     ${store.cloud ? '' : `<button class="chip" data-action="switch-me" title="Modo prueba: cambia quién usa este móvil">
       <small>Eres</small> ${name(me)} ⇄
-    </button>`}
+    </button>`}</div>
   </header>`;
 }
 
@@ -99,6 +101,7 @@ function viewAuth() {
       <button class="btn" type="submit">${signup ? 'Crear cuenta' : 'Entrar'}</button>
       <button class="btn secondary" type="button" data-action="auth-toggle">${signup ? 'Ya tengo cuenta' : 'Soy nuevo: crear cuenta'}</button>
     </form>
+    <button class="btn ghost" data-action="demo">👀 Ver la demo sin cuenta</button>
   </section>`;
 }
 
@@ -148,6 +151,100 @@ function viewSetup() {
   </section>`;
 }
 
+function greeting() {
+  const h = new Date().getHours();
+  return h < 6 ? 'Buenas noches' : h < 13 ? 'Buenos días' : h < 21 ? 'Buenas tardes' : 'Buenas noches';
+}
+
+function hero() {
+  const k = today(), m = ui.data.moods[k] || {}, s = streak();
+  const hr = new Date().getHours(), night = hr >= 21 || hr < 6;
+  return `<section class="hero ${night ? 'night' : ''}">
+    <div class="hero-text">
+      <p class="hello">${greeting()}, ${name(ui.me)}</p>
+      <p class="date">${cap(fmtDate(k))}</p>
+      <span class="streak-chip">🔥 ${s} ${s === 1 ? 'día' : 'días'} de racha</span>
+    </div>
+    <div class="floe">
+      <div class="duo">${penguin('a', m.a?.mood || 'feliz', 84, 'bob')}${penguin('b', m.b?.mood || 'amor', 84, 'bob delay')}</div>
+      <div class="ice"></div>
+    </div>
+  </section>`;
+}
+
+const hugById = (id) => HUGS.find((h) => h[0] === id) || HUGS[0];
+function hugItems(who, days = 3) {
+  const out = [];
+  for (let i = 0; i < days; i++) {
+    const k = addDays(today(), -i);
+    for (const it of ui.data.hugs?.[k]?.[who]?.items || []) out.push({ ...it, day: k });
+  }
+  return out.sort((x, y) => y.at - x.at);
+}
+
+function hugsCard() {
+  const me = ui.me, ot = other(me);
+  const got = hugItems(ot).slice(0, 4);
+  const sentToday = (ui.data.hugs?.[today()]?.[me]?.items || []).length;
+  return `<article class="card">
+    <div class="row space"><h2 class="mt0">Mandar un mimo</h2><span class="hint" style="margin:0">${sentToday ? `Hoy: ${sentToday} enviados` : ''}</span></div>
+    <div class="hugs" role="group" aria-label="Elige un mimo">${HUGS.map(([id, e, label]) =>
+      `<button class="hug ${ui.hugPick === id ? 'on' : ''}" data-action="hug-pick" data-hug="${id}" aria-pressed="${ui.hugPick === id}"><span class="emoji">${e}</span>${label}</button>`).join('')}</div>
+    ${ui.hugPick ? `<form data-form="hug" class="hug-form">
+      <input name="msg" maxlength="80" placeholder="Añade un mensaje (opcional)" aria-label="Mensaje del mimo" autocomplete="off">
+      <button class="btn" type="submit">Enviar ${hugById(ui.hugPick)[2].toLowerCase()} a ${name(ot)}</button>
+    </form>` : ''}
+    ${got.length ? `<div class="got"><div class="label" style="margin-top:14px">Recibidos de ${name(ot)}</div>${got.map((h) => {
+      const [, e, label] = hugById(h.type);
+      return `<div class="got-row"><span class="emoji">${e}</span><div><b>${label}</b>${h.msg ? `<p>${esc(h.msg)}</p>` : ''}</div><small>${timeAgo(h.at)}</small></div>`;
+    }).join('')}</div>` : ''}
+  </article>`;
+}
+
+function timeAgo(at) {
+  const min = Math.round((Date.now() - at) / 60000);
+  if (min < 1) return 'ahora';
+  if (min < 60) return `hace ${min} min`;
+  const h = Math.round(min / 60);
+  if (h < 24) return `hace ${h} h`;
+  return `hace ${Math.round(h / 24)} d`;
+}
+
+// Animación cuando llega un mimo nuevo
+function checkNewHug() {
+  const ot = other(ui.me), newest = hugItems(ot, 2)[0];
+  const key = `iglu-hug-seen-${store.demo ? 'demo-' : ''}${ui.me}`;
+  const seen = Number(localStorage.getItem(key) || 0);
+  if (!newest || newest.at <= seen) return;
+  localStorage.setItem(key, String(newest.at));
+  showHug(ot, newest);
+}
+
+function showHug(from, h) {
+  const [id, e, , phrase] = hugById(h.type);
+  const el = document.createElement('div');
+  el.className = 'hug-overlay';
+  el.setAttribute('role', 'dialog');
+  el.setAttribute('aria-label', `${name(from)} ${phrase}`);
+  el.innerHTML = `<div class="hug-pop">
+    <div class="scene hug-${id}">
+      <span class="pa">${penguin('a', 'amor', 104)}</span>
+      <span class="pb">${penguin('b', 'amor', 104)}</span>
+      <span class="fx">${e}</span><span class="fx f2">${e}</span><span class="fx f3">💗</span>
+    </div>
+    <h2>${name(from)} ${phrase}</h2>
+    ${h.msg ? `<p class="hug-msg">“${esc(h.msg)}”</p>` : ''}
+    <button class="btn" data-close="back">Devolver el mimo 💗</button>
+    <button class="btn secondary" data-close="ok">Cerrar</button>
+  </div>`;
+  el.addEventListener('click', (ev) => {
+    const c = ev.target.closest('[data-close]');
+    if (c?.dataset.close === 'back') { ui.hugPick = h.type; location.hash = 'hoy'; el.remove(); render(); return; }
+    if (c || ev.target === el) el.remove();
+  });
+  document.body.appendChild(el);
+}
+
 function viewToday() {
   const k = today(), me = ui.me, ot = other(me);
   const a = ui.data.answers[k] || {};
@@ -180,13 +277,13 @@ function viewToday() {
       ${['a', 'b'].map((w) => `<div class="answer">${penguin(w, null, 34)}<div class="bubble"><b>${name(w)}</b><p>${esc(pa[w].text)}</p></div></div>`).join('')}</details>`);
   }
 
-  return `${codeCard()}<h1 class="page">Pregunta del día</h1>
-    <p class="lead">${fmtDate(k)} · 🔥 ${streak()} ${streak() === 1 ? 'día' : 'días'} de racha</p>
+  return `${codeCard()}${hero()}
     <article class="card">
-      <div class="label">Hoy</div>
+      <div class="label">Pregunta del día</div>
       <p class="question">${esc(questionFor(k))}</p>
       ${body}
     </article>
+    ${hugsCard()}
     <article class="card">
       <div class="row space"><h2 class="mt0">¿Cómo estáis hoy?</h2><a class="btn small secondary" href="#diario">${m[me] ? 'Ver diario' : 'Apuntar'}</a></div>
       <div class="today-moods" style="margin-top:10px">${moodLine}</div>
@@ -368,9 +465,14 @@ function viewUs() {
       <h2>Ajustes</h2>
       ${store.cloud
         ? `<p class="hint mt0">Vuestros datos se guardan en vuestra base de datos privada y solo los veis vosotros dos.</p>
-           <button class="btn secondary" data-action="signout">Cerrar sesión</button>`
-        : `<p class="hint mt0">Modo prueba: los datos se guardan solo en este dispositivo. Usa el botón “Eres …” de arriba para cambiar de persona.</p>
-           <button class="btn secondary" data-action="reset">Borrar todo y empezar de nuevo</button>`}
+           <button class="btn secondary" data-action="signout">Cerrar sesión</button>
+           <button class="btn danger" data-action="delete-iglu">Eliminar nuestro iglú</button>
+           <p class="hint">Borra el iglú con las respuestas, el diario, las partidas y los mimos de los dos. Vuestras cuentas siguen existiendo y podéis crear otro iglú.</p>`
+        : store.demo
+          ? `<p class="hint mt0">Estás viendo la demo con datos de ejemplo. Usa “Eres …” arriba para ver la app como la otra persona.</p>
+             <button class="btn secondary" data-action="exit-demo">Salir de la demo</button>`
+          : `<p class="hint mt0">Modo prueba: los datos se guardan solo en este dispositivo. Usa el botón “Eres …” de arriba para cambiar de persona.</p>
+             <button class="btn secondary" data-action="reset">Borrar todo y empezar de nuevo</button>`}
     </article>`;
 }
 
@@ -382,6 +484,7 @@ const ERRORS = {
   'bad code': 'Ese código no existe. Revísalo.',
   'couple full': 'Ese iglú ya tiene a sus dos pingüinos.',
   'already in a couple': 'Ya estás en un iglú.',
+  'rate limit': 'Demasiados intentos seguidos. Espera unos minutos.',
 };
 const errText = (err) => {
   const m = err?.message || String(err);
@@ -402,6 +505,7 @@ async function render() {
   const views = { hoy: viewToday, diario: viewDiary, juego: viewGame, nosotros: viewUs };
   const fn = views[view] || viewToday;
   root.innerHTML = header() + `<main>${fn()}</main>` + tabs(views[view] ? view : 'hoy');
+  if (!document.querySelector('.hug-overlay')) checkNewHug();
 }
 
 // ---------- eventos ----------
@@ -428,6 +532,13 @@ root.addEventListener('submit', async (e) => {
       await store.joinCouple(fd.get('code').trim(), fd.get('name').trim());
       ui.status = null;
       toast('¡Ya estáis los dos en el iglú! 🐧🐧');
+    } else if (kind === 'hug') {
+      const k = today(), list = [...(ui.data.hugs?.[k]?.[ui.me]?.items || [])];
+      const type = ui.hugPick;
+      list.push({ type, msg: fd.get('msg').trim(), at: Date.now() });
+      await store.saveHugs(k, ui.me, list.slice(-30));
+      ui.hugPick = null;
+      toast(`${hugById(type)[1]} Enviado a ${name(other(ui.me))}`);
     } else if (kind === 'answer') {
       const text = fd.get('text').trim();
       if (!text) return;
@@ -458,6 +569,15 @@ root.addEventListener('click', async (e) => {
     await render();
     toast(`Ahora eres ${name(ui.me)} (modo prueba)`);
     return;
+  }
+  if (a === 'demo') { store.enterDemo(); return; }
+  if (a === 'exit-demo') { store.exitDemo(); return; }
+  if (a === 'hug-pick') ui.hugPick = ui.hugPick === el.dataset.hug ? null : el.dataset.hug;
+  if (a === 'delete-iglu') {
+    if (!confirm('¿Eliminar vuestro iglú? Se borrará TODO: respuestas, diario, partidas y mimos de los dos.')) return;
+    if (!confirm('Última confirmación: esto no se puede deshacer. ¿Eliminar?')) return;
+    try { await store.deleteCouple(); ui.status = null; location.hash = ''; toast('Iglú eliminado'); }
+    catch (err) { toast(errText(err)); return; }
   }
   if (a === 'auth-toggle') ui.authMode = ui.authMode === 'signup' ? 'signin' : 'signup';
   if (a === 'signout') { await store.signOut(); ui.status = null; location.hash = ''; }

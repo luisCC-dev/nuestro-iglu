@@ -3,14 +3,16 @@
 //  - local: localStorage (modo prueba en un solo dispositivo)
 import { SUPABASE_URL, SUPABASE_KEY } from './config.js';
 
-const CLOUD = !!SUPABASE_KEY;
-const SECTION = { answer: 'answers', mood: 'moods', game: 'games' };
+// Modo demo: datos de ejemplo en este dispositivo, sin cuenta (?demo o botón "Ver demo").
+const DEMO = sessionStorage.getItem('iglu-demo') === '1';
+const CLOUD = !!SUPABASE_KEY && !DEMO;
+const SECTION = { answer: 'answers', mood: 'moods', game: 'games', hug: 'hugs' };
 let sb = null;
 let member = null; // { slot, couple_id, name } en modo cloud
 
 // ---------- modo local ----------
-const KEY = 'iglu-data-v1', ME_KEY = 'iglu-me';
-const empty = () => ({ names: null, answers: {}, moods: {}, games: {} });
+const KEY = DEMO ? 'iglu-demo-v1' : 'iglu-data-v1', ME_KEY = DEMO ? 'iglu-demo-me' : 'iglu-me';
+const empty = () => ({ names: null, answers: {}, moods: {}, games: {}, hugs: {} });
 function loadLocal() { try { return { ...empty(), ...JSON.parse(localStorage.getItem(KEY)) }; } catch { return empty(); } }
 function putLocal(kind, date, who, value) {
   const d = loadLocal(), s = SECTION[kind];
@@ -28,9 +30,14 @@ async function putCloud(kind, date, value) {
 
 export const store = {
   cloud: CLOUD,
+  demo: DEMO,
+  canCloud: !!SUPABASE_KEY,
+  enterDemo() { sessionStorage.setItem('iglu-demo', '1'); location.reload(); },
+  exitDemo() { sessionStorage.removeItem('iglu-demo'); localStorage.removeItem('iglu-demo-v1'); location.hash = ''; location.reload(); },
 
   // Devuelve 'ready' | 'signed-out' | 'no-couple'
   async init() {
+    if (DEMO && !localStorage.getItem(KEY)) seedDemo();
     if (!CLOUD) return 'ready';
     if (!sb) {
       const { createClient } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm');
@@ -65,6 +72,7 @@ export const store = {
   async setNames(a, b) { const d = loadLocal(); d.names = { a, b }; localStorage.setItem(KEY, JSON.stringify(d)); },
   async saveAnswer(date, who, text) { CLOUD ? await putCloud('answer', date, { text }) : putLocal('answer', date, who, { text }); },
   async saveMood(date, who, mood, note) { CLOUD ? await putCloud('mood', date, { mood, note }) : putLocal('mood', date, who, { mood, note }); },
+  async saveHugs(date, who, items) { CLOUD ? await putCloud('hug', date, { items }) : putLocal('hug', date, who, { items }); },
   async saveGame(date, who, picks, guesses) { CLOUD ? await putCloud('game', date, { picks, guesses }) : putLocal('game', date, who, { picks, guesses }); },
   async reset() { localStorage.removeItem(KEY); localStorage.removeItem(ME_KEY); },
 
@@ -80,6 +88,10 @@ export const store = {
   async signIn(email, password) { const { error } = await sb.auth.signInWithPassword({ email, password }); if (error) throw error; },
   async signOut() { await sb.auth.signOut(); member = null; },
   async createCouple(name) { const { data, error } = await sb.rpc('create_couple', { p_name: name }); if (error) throw error; return data; },
+  async deleteCouple() {
+    if (!CLOUD) { localStorage.removeItem(KEY); localStorage.removeItem(ME_KEY); return; }
+    const { error } = await sb.rpc('delete_my_couple'); if (error) throw error; member = null;
+  },
   async joinCouple(code, name) { const { error } = await sb.rpc('join_couple', { p_code: code, p_name: name }); if (error) throw error; },
 
   // Avisa cuando la pareja guarda algo
@@ -91,6 +103,25 @@ export const store = {
       .subscribe();
   },
 };
+
+// ---- Datos de ejemplo para el modo demo ----
+function seedDemo() {
+  const d = empty(), t = dateKey();
+  d.names = { a: 'Luis', b: 'Ana' };
+  const moods = ['feliz', 'amor', 'tranquilo', 'emocionado', 'cansado', 'feliz', 'triste', 'amor', 'feliz', 'tranquilo'];
+  const textsA = ['Una cabaña en la nieve con chocolate', 'Un pingüino, obviamente', 'Cuando te ríes con la nariz', 'Ir a Japón contigo', 'Pizza fría del día anterior'];
+  const textsB = ['Una casa con jardín y un gato', 'Una nutria', 'Cómo me tapas con la manta', 'Islandia a ver auroras', 'Tortitas los domingos'];
+  for (let i = 1; i <= 9; i++) {
+    const k = addDays(t, -i), at = Date.now() - i * 86400000;
+    d.moods[k] = { a: { mood: moods[i % 10], note: '', at }, b: { mood: moods[(i + 3) % 10], note: '', at } };
+    if (i <= 6) d.answers[k] = { a: { text: textsA[i % 5], at }, b: { text: textsB[i % 5], at } };
+  }
+  d.answers[t] = { b: { text: 'Que me hagas reír aunque esté cansada', at: Date.now() } };
+  d.moods[t] = { b: { mood: 'amor', note: 'Día largo, pero con ganas de verte.', at: Date.now() } };
+  d.hugs[t] = { b: { items: [{ type: 'abrazo', msg: '¡Buenos días, pingüino!', at: Date.now() - 3600000 }], at: Date.now() } };
+  localStorage.setItem(KEY, JSON.stringify(d));
+  localStorage.setItem(ME_KEY, 'a');
+}
 
 // ---- Fechas (siempre hora local) ----
 export function dateKey(d = new Date()) {

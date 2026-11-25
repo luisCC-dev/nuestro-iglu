@@ -18,6 +18,7 @@ Abrir http://localhost:8765 (los módulos JS no funcionan abriendo el archivo co
 
 ## Pendiente / ideas
 - Probar con las dos cuentas reales.
+- Hecho v3: modo demo (botón "Ver la demo sin cuenta", datos de ejemplo, sessionStorage), mimos (kind hug, animación al recibir), eliminar iglú (rpc delete_my_couple), portada con saludo. Migración: supabase/002_mimos_y_borrar.sql (ya ejecutada).
 - Notificación diaria, más preguntas, "enviar un abrazo".
 
 Archivos: `index.html`, `styles.css`, `js/app.js` (pantallas), `js/store.js` (datos), `js/config.js`, `js/penguins.js` (dibujos), `js/content.js` (preguntas), `supabase/schema.sql`.

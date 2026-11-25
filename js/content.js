@@ -72,3 +72,15 @@ export const THIS_OR_THAT = [
 ];
 
 export const ROUND_SIZE = 5;
+
+// Mimos: [id, emoji, texto, frase para quien lo recibe]
+export const HUGS = [
+  ['abrazo', '🤗', 'Abrazo', 'te manda un abrazo'],
+  ['beso', '😘', 'Beso', 'te manda un beso'],
+  ['choca', '🙌', 'Choca esa', 'quiere chocar esa aleta'],
+  ['pienso', '💭', 'Pienso en ti', 'está pensando en ti'],
+  ['extraño', '🥺', 'Te echo de menos', 'te echa de menos'],
+  ['siesta', '😴', 'Siesta juntos', 'quiere una siesta contigo'],
+  ['baile', '💃', 'Bailamos', 'te saca a bailar'],
+  ['cosquillas', '😆', 'Cosquillas', 'te hace cosquillas'],
+];
