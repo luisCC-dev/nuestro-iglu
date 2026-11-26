@@ -7,13 +7,13 @@ import { ACHIEVEMENTS, mondayOf, weekChallenges, CHALLENGE_REWARD, fishForRoll, 
 // Modo demo: datos de ejemplo en este dispositivo, sin cuenta (?demo o botón "Ver demo").
 const DEMO = sessionStorage.getItem('iglu-demo') === '1';
 const CLOUD = !!SUPABASE_KEY && !DEMO;
-const SECTION = { answer: 'answers', mood: 'moods', game: 'games', hug: 'hugs', likely: 'likely', word: 'words', wordplay: 'wordplays', gift: 'gifts', fish: 'fish' };
+const SECTION = { answer: 'answers', mood: 'moods', game: 'games', hug: 'hugs', likely: 'likely', word: 'words', wordplay: 'wordplays', gift: 'gifts', fish: 'fish', draw: 'draws', drawguess: 'drawguesses' };
 let sb = null;
 let member = null; // { slot, couple_id, name } en modo cloud
 
 // ---------- modo local ----------
 const KEY = DEMO ? 'iglu-demo-v1' : 'iglu-data-v1', ME_KEY = DEMO ? 'iglu-demo-me' : 'iglu-me';
-const empty = () => ({ names: null, answers: {}, moods: {}, games: {}, hugs: {}, likely: {}, words: {}, wordplays: {}, gifts: {}, fish: {}, claims: [], styles: { a: {}, b: {} }, bg: null, owned: { a: [], b: [] } });
+const empty = () => ({ names: null, answers: {}, moods: {}, games: {}, hugs: {}, likely: {}, words: {}, wordplays: {}, gifts: {}, fish: {}, draws: {}, drawguesses: {}, claims: [], styles: { a: {}, b: {} }, bg: null, owned: { a: [], b: [] } });
 function loadLocal() { try { return { ...empty(), ...JSON.parse(localStorage.getItem(KEY)) }; } catch { return empty(); } }
 function putLocal(kind, date, who, value) {
   const d = loadLocal(), s = SECTION[kind];
@@ -175,6 +175,8 @@ export function coinsEarned(d, slot) {
   for (const e of Object.values(d.wordplays || {})) { const r = e[slot]?.result; n += r === 'win' ? 10 : r === 'lose' ? 3 : 0; }
   for (const e of Object.values(d.hugs || {})) if (e[slot]) n += Math.min((e[slot].items || []).length, 3);
   for (const [day, e] of Object.entries(d.gifts || {})) if (e[slot]) n += giftLocal(day, slot);
+  for (const [day, e] of Object.entries(d.draws || {})) if (e[slot]) n += 5 + (d.drawguesses?.[day]?.[slot === 'a' ? 'b' : 'a']?.result === 'win' ? 5 : 0);
+  for (const e of Object.values(d.drawguesses || {})) { const r = e[slot]?.result; n += r === 'win' ? 10 : r === 'lose' ? 2 : 0; }
   for (const [day, e] of Object.entries(d.fish || {})) if (e[slot]) n += catches(e[slot].casts).reduce((t, i) => t + fishAt(day, slot, i).value, 0);
   return n + achievementBonus(achievementMetrics(d, slot)) + CHALLENGE_REWARD * (d.claims || []).length;
 }
@@ -190,6 +192,8 @@ export function coupleXp(d) {
     n += Object.values(d.wordplays || {}).filter((e) => e[slot]?.result).length * 5;
     n += Object.values(d.hugs || {}).reduce((t, e) => t + Math.min(e[slot]?.items?.length || 0, 3), 0);
     n += Object.values(d.fish || {}).reduce((t, e) => t + 2 * catches(e[slot]?.casts).length, 0);
+    n += Object.values(d.draws || {}).filter((e) => e[slot]).length * 3;
+    n += Object.values(d.drawguesses || {}).filter((e) => e[slot]?.result).length * 5;
   }
   return n + 10 * bothDays('answers', d) + 30 * (d.claims || []).length;
 }
@@ -228,6 +232,7 @@ export function achievementMetrics(d, slot) {
     wins: Object.values(d.wordplays || {}).filter((e) => e[slot]?.result === 'win').length,
     buys: (d.owned?.[slot] || []).length, streak,
     fish: Object.values(d.fish || {}).reduce((n, e) => n + catches(e[slot]?.casts).length, 0),
+    draws: Object.values(d.draws || {}).filter((e) => e[slot]).length,
   };
 }
 export const achievementBonus = (m) => ACHIEVEMENTS.reduce((n, a) => n + (m[a.metric] >= a.goal ? a.reward : 0), 0);
@@ -251,6 +256,9 @@ function seedDemo() {
   d.hugs[t] = { b: { items: [{ type: 'abrazo', msg: '¡Buenos días, pingüino!', at: Date.now() - 3600000 }], at: Date.now() } };
   d.likely[t] = { b: { picks: ['a', 'b', 'a', 'a', 'b'], at: Date.now() } };
   d.words[t] = { b: { word: 'CHOCOLATE', clue: 'Lo que siempre me robas', at: Date.now() } };
+  const circle = []; for (let i = 0; i <= 36; i++) { const g = (i / 36) * Math.PI * 2; circle.push(Math.round(500 + 170 * Math.cos(g)), Math.round(500 + 170 * Math.sin(g))); }
+  const rays = Array.from({ length: 8 }, (_, i) => { const g = (i / 8) * Math.PI * 2; return { c: '#ff9d3d', s: 22, p: [Math.round(500 + 230 * Math.cos(g)), Math.round(500 + 230 * Math.sin(g)), Math.round(500 + 330 * Math.cos(g)), Math.round(500 + 330 * Math.sin(g))] }; });
+  d.draws[t] = { b: { word: 'sol', strokes: [{ c: '#ffd23d', s: 44, p: circle }, ...rays, { c: '#1f2a3a', s: 14, p: [430, 460, 432, 462] }, { c: '#1f2a3a', s: 14, p: [570, 460, 572, 462] }, { c: '#1f2a3a', s: 10, p: [420, 560, 460, 600, 500, 610, 540, 600, 580, 560] }], at: Date.now() } };
   localStorage.setItem(KEY, JSON.stringify(d));
   localStorage.setItem(ME_KEY, 'a');
 }

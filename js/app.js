@@ -1,7 +1,8 @@
 import { store, dateKey, addDays, dayNumber, achievementMetrics, fishAt, catches } from './store.js';
 import { penguin, MOODS, moodById, setStyles } from './penguins.js';
 import { scene, bgSwatch } from './scene.js';
-import { QUESTIONS, THIS_OR_THAT, ROUND_SIZE, HUGS, LIKELY, LIKELY_SIZE, SHOP, SHOP_CATS, itemById, EARN, ACHIEVEMENTS, levelOf, weekChallenges, CHALLENGE_REWARD, LEVELS, FISH, CASTS_PER_DAY } from './content.js';
+import { drawAll, replay, mountPad, pointCount } from './draw.js';
+import { QUESTIONS, THIS_OR_THAT, ROUND_SIZE, HUGS, LIKELY, LIKELY_SIZE, SHOP, SHOP_CATS, itemById, EARN, ACHIEVEMENTS, levelOf, weekChallenges, CHALLENGE_REWARD, LEVELS, FISH, CASTS_PER_DAY, DRAW_WORDS, DRAW_TRIES, DRAW_COLORS } from './content.js';
 
 const root = document.getElementById('app');
 const TABS = [
@@ -524,6 +525,7 @@ function viewGame() {
   if (ui.sub === 'quien') return gameLikely();
   if (ui.sub === 'palabra') return gameWord();
   if (ui.sub === 'pesca') return gameFish();
+  if (ui.sub === 'dibujo') return gameDraw();
   const k = today(), me = ui.me, ot = other(me);
   const g = ui.data.games[k] || {}, l = ui.data.likely[k] || {};
   const pw = partnerWord();
@@ -542,6 +544,7 @@ function viewGame() {
     <div class="games">
       ${card('#juego/esto', '🍕<small>o</small>🍝', 'Esto o aquello', 'Elige y adivina lo que eligió tu pareja.', status(g[me], g[ot]))}
       ${card('#juego/quien', penguin('a', 'emocionado', 44) + penguin('b', 'feliz', 44), '¿Quién es más probable?', 'Votad quién de los dos haría cada cosa.', status(l[me], l[ot]))}
+      ${card('#juego/dibujo', '✏️', 'Dibuja y adivina', 'Dibuja una palabra y adivina el dibujo de tu pareja.', drawStatus())}
       ${card('#juego/pesca', '🎣', 'Pesca en el hielo', 'Pulsa en el momento justo y pesca peces para ganar monedas.', fishStatus())}
       ${card('#juego/palabra', '🧊', 'Palabra secreta', 'Pon una palabra y adivina la suya antes de que se derrita el hielo.', wordSt)}
     </div>`;
@@ -587,6 +590,100 @@ function gameLikely() {
   }
   return `${back()}<h1 class="page">¿Quién es más probable?</h1>
     <p class="lead">Vota quién de los dos haría cada cosa. Lo de ${name(ot)} se ve cuando votéis los dos.</p>${body}`;
+}
+
+// ---------- juego: Dibuja y adivina ----------
+const SIZES = [[10, 'Fino'], [22, 'Medio'], [44, 'Gordo']];
+function partnerDraw() {
+  const ot = other(ui.me);
+  for (let i = 0; i < 3; i++) {
+    const d = addDays(today(), -i), dr = ui.data.draws?.[d]?.[ot];
+    if (!dr) continue;
+    const play = ui.data.drawguesses?.[d]?.[ui.me];
+    if (i === 0 || !play?.result) return { day: d, ...dr, play };
+  }
+  return null;
+}
+function drawStatus() {
+  const pd = partnerDraw(), mine = ui.data.draws?.[today()]?.[ui.me];
+  if (pd && !pd.play?.result) return ['todo', 'Tienes un dibujo por adivinar'];
+  if (!mine) return ['todo', `Dibuja algo para ${name(other(ui.me))}`];
+  const res = ui.data.drawguesses?.[today()]?.[other(ui.me)]?.result;
+  return res ? ['ok', `${name(other(ui.me))} ya lo vio`] : ['wait', `Esperando a ${name(other(ui.me))}`];
+}
+const sameWord = (a, b) => normWord(a).replace(/ /g, '') === normWord(b).replace(/ /g, '');
+function hintBoxes(word, tries, reveal) {
+  const w = normWord(word), fails = tries.length;
+  let shown = 0;
+  return `<div class="word small">${[...w].map((c) => {
+    if (c === ' ') return '<span class="gap"></span>';
+    const show = reveal || shown++ < fails;
+    return `<span class="lt ${show ? 'on' : ''}">${show ? c : ''}</span>`;
+  }).join('')}</div>`;
+}
+
+function gameDraw() {
+  const me = ui.me, ot = other(me), k = today();
+  const pd = partnerDraw();
+  let guess;
+  if (!pd) {
+    guess = `<div class="locked">${penguin(ot, 'cansado', 52)}<p>${name(ot)} todavía no te ha dejado ningún dibujo.</p></div>`;
+  } else {
+    const tries = pd.play?.tries || [], res = pd.play?.result;
+    guess = `<canvas class="paper" id="guess-canvas" aria-label="Dibujo de ${name(ot)}"></canvas>
+      <button class="btn secondary small replay-btn" data-action="draw-replay">↻ Ver otra vez</button>
+      ${hintBoxes(pd.word, tries, !!res)}
+      ${res === 'win' ? `<p class="question center" style="margin:6px 0 0">¡Acertaste! Era «${esc(pd.word)}» · +10 🪙</p>`
+        : res === 'lose' ? `<p class="question center" style="margin:6px 0 0">Era «${esc(pd.word)}» · +2 🪙</p>`
+        : `<form data-form="drawguess" class="guess-form">
+            <input name="guess" required maxlength="30" autocomplete="off" placeholder="¿Qué es?" aria-label="Tu respuesta">
+            <button class="btn" type="submit">Adivinar</button>
+          </form>
+          <p class="hint center">Te quedan ${DRAW_TRIES - tries.length} intentos${tries.length ? ` · dijiste: ${tries.map(esc).join(', ')}` : ''}. Cada fallo descubre una letra.</p>`}`;
+  }
+
+  const mine = ui.data.draws?.[k]?.[me];
+  let draw;
+  if (mine) {
+    const op = ui.data.drawguesses?.[k]?.[ot];
+    draw = `<canvas class="paper small" id="mine-canvas" aria-label="Tu dibujo"></canvas>
+      <p class="center mt0">Dibujaste <b>«${esc(mine.word)}»</b></p>
+      <p class="hint center">${!op ? `${name(ot)} aún no lo ha visto.` : op.result === 'win' ? `🎉 ${name(ot)} lo adivinó${op.tries.length > 1 ? ` al intento ${op.tries.length}` : ' a la primera'}. +5 🪙 extra para ti.`
+        : op.result === 'lose' ? `${name(ot)} no lo adivinó. Dijo: ${op.tries.map(esc).join(', ')}` : `${name(ot)} lleva ${op.tries.length} intento(s): ${op.tries.map(esc).join(', ')}`}</p>`;
+  } else if (!ui.pad) {
+    ui.drawOpts ??= [...DRAW_WORDS].sort(() => Math.random() - 0.5).slice(0, 3);
+    draw = `<p class="mt0">Elige qué vas a dibujar (${name(ot)} no lo verá):</p>
+      <div class="word-opts">${ui.drawOpts.map((w) => `<button class="btn secondary" data-action="draw-pick" data-word="${esc(w)}">${esc(w)}</button>`).join('')}</div>`;
+  } else {
+    const pad = ui.pad;
+    draw = `<p class="mt0">Dibuja: <b>«${esc(pad.word)}»</b> · sin letras ni números 😉</p>
+      <canvas class="paper" id="pad-canvas" aria-label="Lienzo para dibujar"></canvas>
+      <div class="tools">
+        <div class="colors">${DRAW_COLORS.map((c) => `<button class="sw ${pad.color === c ? 'on' : ''} ${c === '#ffffff' ? 'eraser' : ''}" style="background:${c}" data-action="draw-color" data-c="${c}" aria-label="${c === '#ffffff' ? 'Goma' : 'Color ' + c}">${c === '#ffffff' ? '🧽' : ''}</button>`).join('')}</div>
+        <div class="row" style="gap:6px;flex-wrap:wrap">${SIZES.map(([v, l]) => `<button class="chip ${pad.size === v ? 'on' : ''}" data-action="draw-size" data-s="${v}">${l}</button>`).join('')}
+          <button class="chip" data-action="draw-undo">↶ Deshacer</button><button class="chip" data-action="draw-clear">🗑️ Borrar</button></div>
+      </div>
+      <button class="btn" data-action="draw-send" ${pad.strokes.length ? '' : 'disabled'}>Enviar dibujo a ${name(ot)}</button>`;
+  }
+
+  return `${back()}<h1 class="page">Dibuja y adivina</h1>
+    <p class="lead">Dibuja una palabra para ${name(ot)} y adivina la suya. Lo ves trazo a trazo.</p>
+    <article class="card"><h2 class="mt0">El dibujo de ${name(ot)}</h2>${guess}</article>
+    <article class="card"><h2 class="mt0">Tu dibujo para ${name(ot)}</h2>${draw}</article>`;
+}
+
+function afterDrawRender() {
+  ui.stopReplay?.();
+  const pd = partnerDraw();
+  const g = document.getElementById('guess-canvas');
+  if (g && pd) {
+    if (ui.replayed === pd.day + pd.word) drawAll(g, pd.strokes);
+    else { ui.replayed = pd.day + pd.word; ui.stopReplay = replay(g, pd.strokes); }
+  }
+  const m = document.getElementById('mine-canvas');
+  if (m) drawAll(m, ui.data.draws?.[today()]?.[ui.me]?.strokes);
+  const padEl = document.getElementById('pad-canvas');
+  if (padEl && ui.pad) mountPad(padEl, ui.pad, () => { const b = document.querySelector('[data-action=draw-send]'); if (b) b.disabled = !ui.pad.strokes.length; });
 }
 
 // ---------- juego: Pesca en el hielo ----------
@@ -960,7 +1057,7 @@ async function render() {
   checkAchievements();
   checkLevel();
   if (!ui.data.names) { root.innerHTML = viewSetup(); return; }
-  if (store.cloud && !subscribed) { subscribed = true; store.onRemoteChange(() => { if (!document.activeElement?.matches('textarea, input')) render(); }); }
+  if (store.cloud && !subscribed) { subscribed = true; store.onRemoteChange(() => { if (!document.activeElement?.matches('textarea, input') && !ui.pad?.drawing && ui.fishing?.phase !== 'reel') render(); }); }
   const [view, sub] = (location.hash.slice(1) || 'hoy').split('/');
   ui.sub = sub;
   const views = { hoy: viewToday, diario: viewDiary, juego: viewGame, tienda: viewShop, nosotros: viewUs };
@@ -969,6 +1066,7 @@ async function render() {
   if (!document.querySelector('.hug-overlay')) checkNewHug();
   if (view === 'nosotros' && store.cloud) fillPush();
   if (view === 'juego' && ui.sub === 'pesca') startReel();
+  if (view === 'juego' && ui.sub === 'dibujo') afterDrawRender();
 }
 
 // ---------- eventos ----------
@@ -1000,6 +1098,15 @@ root.addEventListener('submit', async (e) => {
       if (!/^[A-ZÑ ]{2,20}$/.test(word) || word.replace(/ /g, '').length < 2) { toast('Usa solo letras (mínimo 2).'); if (btn) btn.disabled = false; return; }
       await store.save('word', today(), ui.me, { word, clue: (fd.get('clue') || '').trim() });
       toast(`Palabra enviada a ${name(other(ui.me))} 🧊`);
+    } else if (kind === 'drawguess') {
+      const pd = partnerDraw();
+      const g = (fd.get('guess') || '').trim();
+      if (!pd || !g) { if (btn) btn.disabled = false; return; }
+      const tries = [...(pd.play?.tries || []), g];
+      const ok = sameWord(g, pd.word);
+      const result = ok ? 'win' : tries.length >= DRAW_TRIES ? 'lose' : null;
+      await store.save('drawguess', pd.day, ui.me, { tries, result });
+      toast(ok ? '¡Acertaste! 🎉' : result ? 'Se acabaron los intentos' : '¡No! Te damos una letra de pista');
     } else if (kind === 'hug') {
       const k = today(), list = [...(ui.data.hugs?.[k]?.[ui.me]?.items || [])];
       const type = ui.hugPick;
@@ -1050,6 +1157,21 @@ root.addEventListener('click', async (e) => {
       }
     } catch (err) { toast(errText(err)); fillPush(); }
     return;
+  }
+  if (a === 'draw-pick') { ui.pad = { word: el.dataset.word, strokes: [], color: DRAW_COLORS[0], size: SIZES[1][0] }; }
+  if (a === 'draw-color' && ui.pad) { ui.pad.color = el.dataset.c; if (el.dataset.c === '#ffffff') ui.pad.size = SIZES[2][0]; }
+  if (a === 'draw-size' && ui.pad) ui.pad.size = Number(el.dataset.s);
+  if (a === 'draw-undo' && ui.pad) ui.pad.strokes.pop();
+  if (a === 'draw-clear' && ui.pad) { if (ui.pad.strokes.length && !confirm('¿Borrar todo el dibujo?')) return; ui.pad.strokes = []; }
+  if (a === 'draw-replay') { ui.replayed = null; }
+  if (a === 'draw-send' && ui.pad) {
+    if (!ui.pad.strokes.length) return;
+    el.disabled = true;
+    try {
+      await store.save('draw', today(), ui.me, { word: ui.pad.word, strokes: ui.pad.strokes });
+      toast(`Dibujo enviado a ${name(other(ui.me))} ✏️`);
+      ui.pad = null; ui.drawOpts = null;
+    } catch (err) { toast(errText(err)); el.disabled = false; return; }
   }
   if (a === 'fish-cast') {
     const i = myCasts().length;

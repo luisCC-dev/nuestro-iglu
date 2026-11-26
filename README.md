@@ -25,6 +25,7 @@ Abrir http://localhost:8765 (los módulos JS no funcionan abriendo el archivo co
 - Hecho v7: cofre diario (kind gift, gift_amount en BD) y logros con premio (achievement_bonus, ACHIEVEMENTS en content.js). Escena separada en js/scene.js + css/scene.css (iglú, fondos con decorado, borde de luz en pingüinos; hecho por agente Sonnet). Iglú en Diario refleja la emoción al elegirla. SQL 007 ya ejecutado.
 - Hecho v8: nivel del iglú (couple_xp, 10 niveles en content.js LEVELS, mejoras dibujadas en scene.js levelExtras) y retos semanales (3 por semana rotando, challenge_goal, claim_challenge: +20 monedas a cada uno y +30 XP). SQL 008 ya ejecutado.
 - Hecho v9: pesca en el hielo (#juego/pesca, kind fish, 5 cañas/día, especie por str_hash igual en JS y SQL, FISH en content.js, logro Pescador, +2 XP por pez). SQL 009 ya ejecutado.
-- Ideas pendientes: regalos, lista de planes, cuenta atrás, cápsula del tiempo, dibuja y adivina, hundir la flota, ¿cuánto me conoces?, tres en raya.
+- Hecho v10: dibuja y adivina (#juego/dibujo, js/draw.js, kinds draw + drawguess, 3 intentos con pista, trazos 0..1000, logro Artista, push redeployada con avisos de dibujos). SQL 010 ya ejecutado.
+- Ideas pendientes: regalos, lista de planes, cuenta atrás, cápsula del tiempo, hundir la flota, ¿cuánto me conoces?, tres en raya.
 
 Archivos: `index.html`, `styles.css`, `js/app.js` (pantallas), `js/store.js` (datos), `js/config.js`, `js/penguins.js` (dibujos), `js/content.js` (preguntas), `supabase/schema.sql`.

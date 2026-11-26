@@ -163,6 +163,8 @@ export const EARN = [
   ['Mandar mimos (máx. 3 al día)', '+1'],
   ['Abrir el cofre del día', '+3 a +10'],
   ['Pescar en el hielo (5 cañas al día)', '+2 a +15'],
+  ['Dibujar (+5 extra si lo adivinan)', '+5'],
+  ['Adivinar un dibujo (fallar da +2)', '+10'],
   ['Conseguir logros (en Nosotros)', 'hasta +100'],
 ];
 
@@ -179,6 +181,7 @@ export const ACHIEVEMENTS = [
   { id: 'racha30', emoji: '💎', name: 'Racha de 30', desc: '30 días seguidos respondiendo los dos', metric: 'streak', goal: 30, reward: 100 },
   { id: 'coleccion', emoji: '🛍️', name: 'Coleccionista', desc: 'Compra 5 objetos en la tienda', metric: 'buys', goal: 5, reward: 25 },
   { id: 'pescador', emoji: '🎣', name: 'Pescador', desc: 'Pesca 25 peces', metric: 'fish', goal: 25, reward: 30 },
+  { id: 'artista', emoji: '🎨', name: 'Artista', desc: 'Haz 10 dibujos', metric: 'draws', goal: 10, reward: 25 },
 ];
 
 // Retos semanales (mismo orden y metas que challenge_goal en 008_nivel_retos.sql)
@@ -235,3 +238,15 @@ export const FISH = [
 ];
 export const CASTS_PER_DAY = 5;
 export const fishForRoll = (r) => FISH.find((f) => r < f.max);
+
+// Dibuja y adivina: palabras fáciles de dibujar
+export const DRAW_WORDS = [
+  'casa', 'sol', 'gato', 'perro', 'pizza', 'corazón', 'árbol', 'coche', 'luna', 'pez', 'pingüino', 'iglú', 'helado', 'flor',
+  'montaña', 'barco', 'avión', 'reloj', 'gafas', 'sombrero', 'taza', 'globo', 'tren', 'estrella', 'nube', 'paraguas',
+  'bicicleta', 'guitarra', 'libro', 'cama', 'manzana', 'plátano', 'tarta', 'regalo', 'llave', 'teléfono', 'zapato',
+  'camiseta', 'pelota', 'playa', 'palmera', 'cohete', 'muñeco de nieve', 'oso', 'conejo', 'serpiente', 'mariposa',
+  'araña', 'caracol', 'castillo', 'puente', 'faro', 'tortuga', 'ballena', 'dinosaurio', 'robot', 'fantasma', 'corona',
+  'anillo', 'vela', 'ojo', 'mano', 'beso', 'arcoíris', 'volcán', 'seta', 'calabaza', 'piña', 'sandía', 'hamburguesa',
+];
+export const DRAW_TRIES = 3;
+export const DRAW_COLORS = ['#1f2a3a', '#ff5b5b', '#ff9d3d', '#ffd23d', '#4fb86a', '#3d8bff', '#9a5cff', '#ff7ab6', '#8a5a36', '#ffffff'];
