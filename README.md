@@ -21,6 +21,7 @@ Abrir http://localhost:8765 (los módulos JS no funcionan abriendo el archivo co
 - Hecho v3: modo demo (botón "Ver la demo sin cuenta", datos de ejemplo, sessionStorage), mimos (kind hug, animación al recibir), eliminar iglú (rpc delete_my_couple), portada con saludo. Migración: supabase/002_mimos_y_borrar.sql (ya ejecutada).
 - Hecho v4: menú de juegos (#juego/esto, #juego/quien, #juego/palabra). "¿Quién es más probable?" (kind likely, oculto hasta jugar los dos). "Palabra secreta" (kind word + wordplay, 6 fallos, el hielo se derrite). Migración supabase/003_juegos.sql (ya ejecutada).
 - Hecho v5: avisos push. sw.js + Ajustes > Avisos (hora del recordatorio, prueba, desactivar). Edge Function `push` (supabase/functions/push, Verify JWT OFF, claves VAPID autogeneradas en push_config). Trigger entries_notify (pg_net) + cron iglu-daily cada hora. SQL 004 y 005 ya ejecutados. iPhone: requiere app en pantalla de inicio (iOS 16.4+).
-- Ideas: economía (la explica Luis), más preguntas, estadísticas de juegos.
+- Hecho v6: monedas + tienda. Monedas calculadas en BD (coins_earned, my_wallet); compras con buy_item, equipar con equip_item (members.style, couples.bg compartido). Catálogo en js/content.js SHOP = precios de shop_price en 006_tienda.sql (mantener iguales). Dibujos en js/penguins.js. SQL 006 ya ejecutado.
+- Ideas: más objetos, estadísticas de juegos.
 
 Archivos: `index.html`, `styles.css`, `js/app.js` (pantallas), `js/store.js` (datos), `js/config.js`, `js/penguins.js` (dibujos), `js/content.js` (preguntas), `supabase/schema.sql`.

@@ -1,12 +1,13 @@
 import { store, dateKey, addDays, dayNumber } from './store.js';
-import { penguin, MOODS, moodById } from './penguins.js';
-import { QUESTIONS, THIS_OR_THAT, ROUND_SIZE, HUGS, LIKELY, LIKELY_SIZE } from './content.js';
+import { penguin, MOODS, moodById, setStyles } from './penguins.js';
+import { QUESTIONS, THIS_OR_THAT, ROUND_SIZE, HUGS, LIKELY, LIKELY_SIZE, SHOP, SHOP_CATS, itemById, EARN } from './content.js';
 
 const root = document.getElementById('app');
 const TABS = [
   { id: 'hoy', label: 'Hoy', ico: '☀️' },
   { id: 'diario', label: 'Diario', ico: '📔' },
   { id: 'juego', label: 'Juego', ico: '🎲' },
+  { id: 'tienda', label: 'Tienda', ico: '🛍️' },
   { id: 'nosotros', label: 'Nosotros', ico: '💞' },
 ];
 
@@ -78,7 +79,7 @@ function header() {
       <div class="avatars">${penguin('a', null, 40)}${penguin('b', null, 40)}</div>
       <span>${name('a')} & ${name('b')}</span>
     </div>
-    <div class="row" style="gap:6px">${store.demo ? '<button class="chip demo" data-action="exit-demo" aria-label="Salir de la demo">Demo ✕</button>' : ''}
+    <div class="row" style="gap:6px"><a class="chip coins" href="#tienda" aria-label="Tus monedas: ${ui.data.wallet}">🪙 ${ui.data.wallet}</a>${store.demo ? '<button class="chip demo" data-action="exit-demo" aria-label="Salir de la demo">Demo ✕</button>' : ''}
     ${store.cloud ? '' : `<button class="chip" data-action="switch-me" title="Modo prueba: cambia quién usa este móvil">
       <small>Eres</small> ${name(me)} ⇄
     </button>`}</div>
@@ -159,7 +160,8 @@ function greeting() {
 function hero() {
   const k = today(), m = ui.data.moods[k] || {}, s = streak();
   const hr = new Date().getHours(), night = hr >= 21 || hr < 6;
-  return `<section class="hero ${night ? 'night' : ''}">
+  const bg = ui.data.bg ? 'bg-' + ui.data.bg.split(':')[1] : night ? 'night' : '';
+  return `<section class="hero ${bg}">
     <div class="hero-text">
       <p class="hello">${greeting()}, ${name(ui.me)}</p>
       <p class="date">${cap(fmtDate(k))}</p>
@@ -652,6 +654,64 @@ function viewUs() {
     </article>`;
 }
 
+// ---------- tienda ----------
+function viewShop() {
+  const me = ui.me, ot = other(me);
+  const cat = ui.shopCat || 'hat';
+  const mine = ui.data.styles[me] || {};
+  const owned = ui.data.owned[me] || [];
+  const sel = ui.shopSel && itemById(ui.shopSel)?.id.startsWith(cat + ':') ? itemById(ui.shopSel) : null;
+  const preview = sel && cat !== 'bg' ? { ...mine, [cat]: sel.id } : mine;
+  const bgId = sel && cat === 'bg' ? sel.id : ui.data.bg;
+  const equipped = (id) => (cat === 'bg' ? ui.data.bg === id : mine[cat] === id);
+
+  let action = '<p class="hint center mt0">Toca un objeto para probártelo.</p>';
+  if (sel) {
+    if (owned.includes(sel.id)) {
+      action = equipped(sel.id)
+        ? `<button class="btn secondary" data-action="shop-equip" data-item="">Quitar ${esc(sel.name.toLowerCase())}</button>`
+        : `<button class="btn" data-action="shop-equip" data-item="${sel.id}">${cat === 'bg' ? 'Poner este fondo' : 'Ponérmelo'}</button>`;
+    } else if (ui.data.wallet >= sel.price) {
+      action = `<button class="btn" data-action="shop-buy" data-item="${sel.id}">Comprar ${esc(sel.name.toLowerCase())} por 🪙 ${sel.price}</button>`;
+    } else {
+      action = `<button class="btn" disabled>Te faltan 🪙 ${sel.price - ui.data.wallet}</button>`;
+    }
+  }
+
+  const items = SHOP.filter((i) => i.id.startsWith(cat + ':')).map((i) => {
+    const has = owned.includes(i.id), on = equipped(i.id);
+    const art = cat === 'bg'
+      ? `<span class="bg-swatch bg-${i.id.split(':')[1]}"></span>`
+      : penguin(me, 'feliz', 64, '', { ...mine, [cat]: i.id });
+    return `<button class="item ${ui.shopSel === i.id ? 'sel' : ''}" data-action="shop-sel" data-item="${i.id}" aria-pressed="${ui.shopSel === i.id}">
+      ${art}<b>${esc(i.name)}</b>
+      <span class="price ${has ? 'has' : ''}">${on ? '✓ Puesto' : has ? 'Tuyo' : `🪙 ${i.price}`}</span>
+    </button>`;
+  }).join('');
+
+  return `<h1 class="page">Tienda</h1>
+    <p class="lead">Viste a tu pingüino y decorad vuestro iglú.${cat === 'bg' ? ' El fondo lo veis los dos.' : ''}</p>
+    <section class="hero stage ${bgId ? 'bg-' + bgId.split(':')[1] : ''}">
+      <span class="wallet">🪙 ${ui.data.wallet}</span>
+      <div class="floe"><div class="duo">${penguin(me, 'feliz', 92, 'bob', preview)}${penguin(ot, 'amor', 72, 'bob delay')}</div><div class="ice"></div></div>
+    </section>
+    <div class="shop-action">${action}</div>
+    <div class="cats" role="tablist">${SHOP_CATS.map(([id, label, e]) =>
+      `<button class="cat ${cat === id ? 'on' : ''}" role="tab" aria-selected="${cat === id}" data-action="shop-cat" data-cat="${id}">${e} ${label}</button>`).join('')}</div>
+    <div class="items">${items}</div>
+    <details class="card earn"><summary>¿Cómo gano monedas?</summary>
+      ${EARN.map(([t, n]) => `<div class="earn-row"><span>${t}</span><b>${n} 🪙</b></div>`).join('')}
+    </details>`;
+}
+
+function coinPop(n) {
+  const el = document.createElement('div');
+  el.className = 'coin-pop';
+  el.textContent = `+${n} 🪙`;
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 1600);
+}
+
 // ---------- avisos push ----------
 const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
 const standalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
@@ -713,6 +773,9 @@ const ERRORS = {
   'couple full': 'Ese iglú ya tiene a sus dos pingüinos.',
   'already in a couple': 'Ya estás en un iglú.',
   'rate limit': 'Demasiados intentos seguidos. Espera unos minutos.',
+  'not enough coins': 'No tienes monedas suficientes.',
+  'already owned': 'Ya lo tienes.',
+  'not owned': 'Primero tienes que comprarlo.',
 };
 const errText = (err) => {
   const m = err?.message || String(err);
@@ -727,11 +790,14 @@ async function render() {
   if (ui.status === 'no-couple') { root.innerHTML = viewCouple(); return; }
   ui.me = store.getMe();
   ui.data = await store.getAll();
+  setStyles(ui.data.styles);
+  if (ui.lastWallet != null && ui.data.wallet > ui.lastWallet && !ui.spending) coinPop(ui.data.wallet - ui.lastWallet);
+  ui.lastWallet = ui.data.wallet; ui.spending = false;
   if (!ui.data.names) { root.innerHTML = viewSetup(); return; }
   if (store.cloud && !subscribed) { subscribed = true; store.onRemoteChange(() => { if (!document.activeElement?.matches('textarea, input')) render(); }); }
   const [view, sub] = (location.hash.slice(1) || 'hoy').split('/');
   ui.sub = sub;
-  const views = { hoy: viewToday, diario: viewDiary, juego: viewGame, nosotros: viewUs };
+  const views = { hoy: viewToday, diario: viewDiary, juego: viewGame, tienda: viewShop, nosotros: viewUs };
   const fn = views[view] || viewToday;
   root.innerHTML = header() + `<main>${fn()}</main>` + tabs(views[view] ? view : 'hoy');
   if (!document.querySelector('.hug-overlay')) checkNewHug();
@@ -799,7 +865,7 @@ root.addEventListener('click', async (e) => {
   if (!el) return;
   const a = el.dataset.action;
   if (a === 'switch-me') {
-    ui.me = other(ui.me); store.setMe(ui.me);
+    ui.me = other(ui.me); store.setMe(ui.me); ui.lastWallet = null; ui.shopSel = null;
     ui.game = null; ui.editMood = false; ui.draftMood = null;
     await render();
     toast(`Ahora eres ${name(ui.me)} (modo prueba)`);
@@ -817,6 +883,24 @@ root.addEventListener('click', async (e) => {
       }
     } catch (err) { toast(errText(err)); fillPush(); }
     return;
+  }
+  if (a === 'shop-cat') { ui.shopCat = el.dataset.cat; ui.shopSel = null; }
+  if (a === 'shop-sel') ui.shopSel = ui.shopSel === el.dataset.item ? null : el.dataset.item;
+  if (a === 'shop-buy' || a === 'shop-equip') {
+    el.disabled = true;
+    const id = el.dataset.item, cat = ui.shopCat || 'hat';
+    try {
+      if (a === 'shop-buy') {
+        const it = itemById(id);
+        await store.buy(id, it.price);
+        await store.equip(cat, id);
+        toast(`¡${it.name} comprado y puesto! ✨`);
+      } else {
+        await store.equip(cat, id || null);
+        toast(id ? '¡Puesto!' : 'Quitado');
+      }
+      ui.spending = true;
+    } catch (err) { toast(errText(err)); el.disabled = false; return; }
   }
   if (a === 'demo') { store.enterDemo(); return; }
   if (a === 'exit-demo') { store.exitDemo(); return; }

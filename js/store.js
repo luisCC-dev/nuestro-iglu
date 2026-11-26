@@ -12,7 +12,7 @@ let member = null; // { slot, couple_id, name } en modo cloud
 
 // ---------- modo local ----------
 const KEY = DEMO ? 'iglu-demo-v1' : 'iglu-data-v1', ME_KEY = DEMO ? 'iglu-demo-me' : 'iglu-me';
-const empty = () => ({ names: null, answers: {}, moods: {}, games: {}, hugs: {}, likely: {}, words: {}, wordplays: {} });
+const empty = () => ({ names: null, answers: {}, moods: {}, games: {}, hugs: {}, likely: {}, words: {}, wordplays: {}, styles: { a: {}, b: {} }, bg: null, owned: { a: [], b: [] } });
 function loadLocal() { try { return { ...empty(), ...JSON.parse(localStorage.getItem(KEY)) }; } catch { return empty(); } }
 function putLocal(kind, date, who, value) {
   const d = loadLocal(), s = SECTION[kind];
@@ -51,16 +51,21 @@ export const store = {
   },
 
   async getAll() {
-    if (!CLOUD) return loadLocal();
-    const [{ data: ms }, { data: es }, { data: c }] = await Promise.all([
-      sb.from('members').select('slot, name').eq('couple_id', member.couple_id),
+    if (!CLOUD) { const d = loadLocal(); d.wallet = coinsEarned(d, this.getMe()) - spentLocal(d, this.getMe()); return d; }
+    const [{ data: ms }, { data: es }, { data: c }, { data: ps }, { data: w }] = await Promise.all([
+      sb.from('members').select('slot, name, style').eq('couple_id', member.couple_id),
       sb.from('entries').select('kind, day, slot, data, updated_at').eq('couple_id', member.couple_id),
-      sb.from('couples').select('code').eq('id', member.couple_id).maybeSingle(),
+      sb.from('couples').select('code, bg').eq('id', member.couple_id).maybeSingle(),
+      sb.from('purchases').select('slot, item').eq('couple_id', member.couple_id),
+      sb.rpc('my_wallet'),
     ]);
     const out = empty();
     out.names = { a: null, b: null };
-    for (const m of ms || []) out.names[m.slot] = m.name;
+    for (const m of ms || []) { out.names[m.slot] = m.name; out.styles[m.slot] = m.style || {}; }
+    for (const p of ps || []) out.owned[p.slot].push(p.item);
     out.code = c?.code;
+    out.bg = c?.bg || null;
+    out.wallet = w ? w.earned - w.spent : 0;
     out.full = !!(out.names.a && out.names.b);
     for (const e of es || []) {
       const s = out[SECTION[e.kind]];
@@ -105,6 +110,23 @@ export const store = {
   async getPush(endpoint) { const { data } = await sb.from('push_subs').select('remind_hour').eq('endpoint', endpoint).maybeSingle(); return data; },
   async deletePush(endpoint) { await sb.from('push_subs').delete().eq('endpoint', endpoint); },
   async testPush(endpoint) { return this.fn({ mode: 'test', endpoint }); },
+  // ---- tienda ----
+  async buy(item, price) {
+    if (CLOUD) { const { error } = await sb.rpc('buy_item', { p_item: item }); if (error) throw error; return; }
+    const d = loadLocal(), me = this.getMe();
+    if (d.owned[me].includes(item)) throw new Error('already owned');
+    if (coinsEarned(d, me) - spentLocal(d, me) < price) throw new Error('not enough coins');
+    d.owned[me].push(item); (d.spent ||= { a: 0, b: 0 })[me] = (d.spent[me] || 0) + price;
+    localStorage.setItem(KEY, JSON.stringify(d));
+  },
+  async equip(cat, item) {
+    if (CLOUD) { const { error } = await sb.rpc('equip_item', { p_cat: cat, p_item: item }); if (error) throw error; return; }
+    const d = loadLocal(), me = this.getMe();
+    if (cat === 'bg') d.bg = item;
+    else if (item) d.styles[me] = { ...d.styles[me], [cat]: item };
+    else { const st = { ...d.styles[me] }; delete st[cat]; d.styles[me] = st; }
+    localStorage.setItem(KEY, JSON.stringify(d));
+  },
   async deleteCouple() {
     if (!CLOUD) { localStorage.removeItem(KEY); localStorage.removeItem(ME_KEY); return; }
     const { error } = await sb.rpc('delete_my_couple'); if (error) throw error; member = null;
@@ -116,10 +138,25 @@ export const store = {
     if (!CLOUD || !member) return;
     sb.channel('entries-' + member.couple_id)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'entries', filter: `couple_id=eq.${member.couple_id}` }, cb)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'members', filter: `couple_id=eq.${member.couple_id}` }, cb)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'members', filter: `couple_id=eq.${member.couple_id}` }, cb)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'couples', filter: `id=eq.${member.couple_id}` }, cb)
       .subscribe();
   },
 };
+
+// ---- Monedas (mismas reglas que coins_earned en la BD) ----
+export function coinsEarned(d, slot) {
+  let n = 0;
+  for (const [day, e] of Object.entries(d.answers || {})) if (e[slot]) n += 10 + (e[slot === 'a' ? 'b' : 'a'] ? 5 : 0);
+  for (const e of Object.values(d.moods || {})) if (e[slot]) n += 5;
+  for (const e of Object.values(d.games || {})) if (e[slot]) n += 10;
+  for (const e of Object.values(d.likely || {})) if (e[slot]) n += 10;
+  for (const e of Object.values(d.words || {})) if (e[slot]) n += 5;
+  for (const e of Object.values(d.wordplays || {})) { const r = e[slot]?.result; n += r === 'win' ? 10 : r === 'lose' ? 3 : 0; }
+  for (const e of Object.values(d.hugs || {})) if (e[slot]) n += Math.min((e[slot].items || []).length, 3);
+  return n;
+}
+const spentLocal = (d, slot) => d.spent?.[slot] || 0;
 
 // ---- Datos de ejemplo para el modo demo ----
 function seedDemo() {

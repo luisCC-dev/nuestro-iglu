@@ -119,3 +119,46 @@ export const LIKELY = [
   'proponer un plan improvisado a las 11 de la noche',
 ];
 export const LIKELY_SIZE = 5;
+
+// Tienda. Precios iguales que supabase/006_tienda.sql (shop_price).
+export const SHOP_CATS = [
+  ['hat', 'Gorros', '🎩'],
+  ['acc', 'Complementos', '🕶️'],
+  ['color', 'Colores', '🎨'],
+  ['bg', 'Fondos', '🏔️'],
+];
+export const SHOP = [
+  { id: 'hat:flower', name: 'Flor', price: 25 },
+  { id: 'hat:beanie', name: 'Gorro de lana', price: 30 },
+  { id: 'hat:party', name: 'Gorro de fiesta', price: 40 },
+  { id: 'hat:headphones', name: 'Cascos', price: 60 },
+  { id: 'hat:tophat', name: 'Chistera', price: 80 },
+  { id: 'hat:crown', name: 'Corona', price: 120 },
+  { id: 'acc:bowtie', name: 'Pajarita', price: 30 },
+  { id: 'acc:glasses', name: 'Gafas redondas', price: 35 },
+  { id: 'acc:necklace', name: 'Collar corazón', price: 45 },
+  { id: 'acc:sunglasses', name: 'Gafas de sol', price: 50 },
+  { id: 'color:black', name: 'Noche', price: 40 },
+  { id: 'color:sky', name: 'Cielo', price: 50 },
+  { id: 'color:mint', name: 'Menta', price: 60 },
+  { id: 'color:pink', name: 'Rosa', price: 60 },
+  { id: 'color:gold', name: 'Dorado', price: 150 },
+  { id: 'bg:snow', name: 'Nevada', price: 60 },
+  { id: 'bg:sunset', name: 'Atardecer', price: 70 },
+  { id: 'bg:beach', name: 'Playa', price: 80 },
+  { id: 'bg:sakura', name: 'Cerezos', price: 90 },
+  { id: 'bg:aurora', name: 'Aurora boreal', price: 100 },
+  { id: 'bg:space', name: 'Espacio', price: 150 },
+];
+export const itemById = (id) => SHOP.find((i) => i.id === id);
+
+// Cómo se ganan monedas (igual que coins_earned en la BD)
+export const EARN = [
+  ['Responder la pregunta del día', '+10'],
+  ['Si respondéis los dos ese día', '+5'],
+  ['Escribir tu día en el diario', '+5'],
+  ['Jugar a Esto o aquello / ¿Quién es más probable?', '+10'],
+  ['Poner una palabra secreta', '+5'],
+  ['Adivinar una palabra (perder da +3)', '+10'],
+  ['Mandar mimos (máx. 3 al día)', '+1'],
+];
