@@ -161,4 +161,20 @@ export const EARN = [
   ['Poner una palabra secreta', '+5'],
   ['Adivinar una palabra (perder da +3)', '+10'],
   ['Mandar mimos (máx. 3 al día)', '+1'],
+  ['Abrir el cofre del día', '+3 a +10'],
+  ['Conseguir logros (en Nosotros)', 'hasta +100'],
+];
+
+// Logros: premio en monedas al llegar a la meta. Igual que achievement_bonus en 007_cofre_logros.sql.
+export const ACHIEVEMENTS = [
+  { id: 'primer', emoji: '🐣', name: 'Primer paso', desc: 'Responde tu primera pregunta', metric: 'answers', goal: 1, reward: 5 },
+  { id: 'semana', emoji: '📅', name: 'Una semana hablando', desc: 'Responde 7 preguntas', metric: 'answers', goal: 7, reward: 20 },
+  { id: 'mes', emoji: '🗓️', name: 'Un mes de preguntas', desc: 'Responde 30 preguntas', metric: 'answers', goal: 30, reward: 60 },
+  { id: 'diario', emoji: '📔', name: 'Querido diario', desc: 'Escribe tu día 7 veces', metric: 'moods', goal: 7, reward: 20 },
+  { id: 'jugon', emoji: '🎲', name: 'Pingüino jugón', desc: 'Juega 10 partidas', metric: 'games', goal: 10, reward: 30 },
+  { id: 'mimoso', emoji: '🤗', name: 'Mimoso', desc: 'Manda 20 mimos', metric: 'hugs', goal: 20, reward: 20 },
+  { id: 'detective', emoji: '🕵️', name: 'Detective', desc: 'Adivina 5 palabras secretas', metric: 'wins', goal: 5, reward: 30 },
+  { id: 'racha7', emoji: '🔥', name: 'Racha de 7', desc: '7 días seguidos respondiendo los dos', metric: 'streak', goal: 7, reward: 40 },
+  { id: 'racha30', emoji: '💎', name: 'Racha de 30', desc: '30 días seguidos respondiendo los dos', metric: 'streak', goal: 30, reward: 100 },
+  { id: 'coleccion', emoji: '🛍️', name: 'Coleccionista', desc: 'Compra 5 objetos en la tienda', metric: 'buys', goal: 5, reward: 25 },
 ];

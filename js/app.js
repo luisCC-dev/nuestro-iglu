@@ -1,7 +1,7 @@
-import { store, dateKey, addDays, dayNumber } from './store.js';
+import { store, dateKey, addDays, dayNumber, achievementMetrics } from './store.js';
 import { penguin, MOODS, moodById, setStyles } from './penguins.js';
 import { scene, bgSwatch } from './scene.js';
-import { QUESTIONS, THIS_OR_THAT, ROUND_SIZE, HUGS, LIKELY, LIKELY_SIZE, SHOP, SHOP_CATS, itemById, EARN } from './content.js';
+import { QUESTIONS, THIS_OR_THAT, ROUND_SIZE, HUGS, LIKELY, LIKELY_SIZE, SHOP, SHOP_CATS, itemById, EARN, ACHIEVEMENTS } from './content.js';
 
 const root = document.getElementById('app');
 const TABS = [
@@ -245,6 +245,44 @@ function showHug(from, h) {
   document.body.appendChild(el);
 }
 
+function giftCard() {
+  const got = ui.data.gifts?.[today()]?.[ui.me];
+  if (got) return `<p class="gift-done">🎁 Cofre de hoy abierto · vuelve mañana a por otro</p>`;
+  return `<article class="card gift">
+    <button class="chest" data-action="gift" aria-label="Abrir el cofre del día"><span class="lid">🎁</span></button>
+    <div><h2 class="mt0">Cofre del día</h2><p class="hint mt0">Ábrelo para ganar entre 3 y 10 monedas. ¡Uno cada día!</p></div>
+  </article>`;
+}
+
+function achievementsCard() {
+  const m = achievementMetrics(ui.data, ui.me);
+  const done = ACHIEVEMENTS.filter((a) => m[a.metric] >= a.goal).length;
+  return `<article class="card">
+    <div class="row space"><h2 class="mt0">Tus logros</h2><span class="hint" style="margin:0">${done} de ${ACHIEVEMENTS.length}</span></div>
+    <div class="achs">${ACHIEVEMENTS.map((a) => {
+      const v = Math.min(m[a.metric], a.goal), ok = v >= a.goal;
+      return `<div class="ach ${ok ? 'ok' : ''}">
+        <span class="ach-ico">${a.emoji}</span>
+        <div class="ach-txt"><b>${a.name}</b><span>${a.desc}</span>
+          <div class="bar"><i style="width:${Math.round((v / a.goal) * 100)}%"></i></div></div>
+        <span class="ach-rew">${ok ? '✓' : `+${a.reward} 🪙`}<small>${ok ? `+${a.reward} 🪙` : `${v}/${a.goal}`}</small></span>
+      </div>`;
+    }).join('')}</div>
+  </article>`;
+}
+
+function checkAchievements() {
+  const key = `iglu-ach-${store.demo ? 'demo-' : ''}${ui.me}`;
+  const m = achievementMetrics(ui.data, ui.me);
+  const now = ACHIEVEMENTS.filter((a) => m[a.metric] >= a.goal).map((a) => a.id);
+  const before = localStorage.getItem(key);
+  localStorage.setItem(key, JSON.stringify(now));
+  if (before == null) return;
+  const prev = JSON.parse(before);
+  const fresh = ACHIEVEMENTS.filter((a) => now.includes(a.id) && !prev.includes(a.id));
+  if (fresh.length) setTimeout(() => toast(`🏆 ${fresh.length > 1 ? "Logros" : "Logro"}: ${fresh.map((a) => a.name).join(" y ")} (+${fresh.reduce((n, a) => n + a.reward, 0)} 🪙)`), 900);
+}
+
 function viewToday() {
   const k = today(), me = ui.me, ot = other(me);
   const a = ui.data.answers[k] || {};
@@ -277,7 +315,7 @@ function viewToday() {
       ${['a', 'b'].map((w) => `<div class="answer">${penguin(w, null, 34)}<div class="bubble"><b>${name(w)}</b><p>${esc(pa[w].text)}</p></div></div>`).join('')}</details>`);
   }
 
-  return `${codeCard()}${hero()}
+  return `${codeCard()}${hero()}${giftCard()}
     <article class="card">
       <div class="label">Pregunta del día</div>
       <p class="question">${esc(questionFor(k))}</p>
@@ -636,6 +674,7 @@ function viewUs() {
       <h2>Emociones de la semana</h2>
       ${['a', 'b'].map((w) => `<div style="margin:10px 0"><div class="row" style="margin-bottom:6px">${penguin(w, null, 30)}<b>${name(w)}</b></div><div class="mood-bars">${weekMoods(w)}</div></div>`).join('')}
     </article>
+    ${achievementsCard()}
     <article class="card">
       <h2>Ajustes</h2>
       ${store.cloud
@@ -789,6 +828,7 @@ async function render() {
   setStyles(ui.data.styles);
   if (ui.lastWallet != null && ui.data.wallet > ui.lastWallet && !ui.spending) coinPop(ui.data.wallet - ui.lastWallet);
   ui.lastWallet = ui.data.wallet; ui.spending = false;
+  checkAchievements();
   if (!ui.data.names) { root.innerHTML = viewSetup(); return; }
   if (store.cloud && !subscribed) { subscribed = true; store.onRemoteChange(() => { if (!document.activeElement?.matches('textarea, input')) render(); }); }
   const [view, sub] = (location.hash.slice(1) || 'hoy').split('/');
@@ -879,6 +919,15 @@ root.addEventListener('click', async (e) => {
       }
     } catch (err) { toast(errText(err)); fillPush(); }
     return;
+  }
+  if (a === 'gift') {
+    if (ui.opening) return;
+    ui.opening = true;
+    el.classList.add('opening');
+    await new Promise((r) => setTimeout(r, 750));
+    try { await store.save('gift', today(), ui.me, { opened: true }); toast('¡Cofre abierto! 🎉'); }
+    catch (err) { toast(errText(err)); }
+    ui.opening = false;
   }
   if (a === 'shop-cat') { ui.shopCat = el.dataset.cat; ui.shopSel = null; }
   if (a === 'shop-sel') ui.shopSel = ui.shopSel === el.dataset.item ? null : el.dataset.item;

@@ -2,17 +2,18 @@
 //  - cloud: Supabase (cada uno en su móvil, con cuenta)
 //  - local: localStorage (modo prueba en un solo dispositivo)
 import { SUPABASE_URL, SUPABASE_KEY } from './config.js';
+import { ACHIEVEMENTS } from './content.js';
 
 // Modo demo: datos de ejemplo en este dispositivo, sin cuenta (?demo o botón "Ver demo").
 const DEMO = sessionStorage.getItem('iglu-demo') === '1';
 const CLOUD = !!SUPABASE_KEY && !DEMO;
-const SECTION = { answer: 'answers', mood: 'moods', game: 'games', hug: 'hugs', likely: 'likely', word: 'words', wordplay: 'wordplays' };
+const SECTION = { answer: 'answers', mood: 'moods', game: 'games', hug: 'hugs', likely: 'likely', word: 'words', wordplay: 'wordplays', gift: 'gifts' };
 let sb = null;
 let member = null; // { slot, couple_id, name } en modo cloud
 
 // ---------- modo local ----------
 const KEY = DEMO ? 'iglu-demo-v1' : 'iglu-data-v1', ME_KEY = DEMO ? 'iglu-demo-me' : 'iglu-me';
-const empty = () => ({ names: null, answers: {}, moods: {}, games: {}, hugs: {}, likely: {}, words: {}, wordplays: {}, styles: { a: {}, b: {} }, bg: null, owned: { a: [], b: [] } });
+const empty = () => ({ names: null, answers: {}, moods: {}, games: {}, hugs: {}, likely: {}, words: {}, wordplays: {}, gifts: {}, styles: { a: {}, b: {} }, bg: null, owned: { a: [], b: [] } });
 function loadLocal() { try { return { ...empty(), ...JSON.parse(localStorage.getItem(KEY)) }; } catch { return empty(); } }
 function putLocal(kind, date, who, value) {
   const d = loadLocal(), s = SECTION[kind];
@@ -154,8 +155,30 @@ export function coinsEarned(d, slot) {
   for (const e of Object.values(d.words || {})) if (e[slot]) n += 5;
   for (const e of Object.values(d.wordplays || {})) { const r = e[slot]?.result; n += r === 'win' ? 10 : r === 'lose' ? 3 : 0; }
   for (const e of Object.values(d.hugs || {})) if (e[slot]) n += Math.min((e[slot].items || []).length, 3);
-  return n;
+  for (const [day, e] of Object.entries(d.gifts || {})) if (e[slot]) n += giftLocal(day, slot);
+  return n + achievementBonus(achievementMetrics(d, slot));
 }
+// Solo modo local/demo: en la nube el cofre lo calcula la BD (gift_amount).
+function giftLocal(day, slot) { let h = 7; for (const c of day + slot) h = (h * 31 + c.charCodeAt(0)) % 100003; return 3 + (h % 8); }
+
+// ---- Logros (mismas métricas que achievement_metrics en la BD) ----
+export function achievementMetrics(d, slot) {
+  const ot = slot === 'a' ? 'b' : 'a', count = (sec) => Object.values(d[sec] || {}).filter((e) => e[slot]).length;
+  const both = Object.entries(d.answers || {}).filter(([, e]) => e[slot] && e[ot]).map(([k]) => k).sort();
+  let streak = 0, run = 0, prev = null;
+  for (const k of both) {
+    const t = Date.parse(k + 'T12:00:00Z');
+    run = prev != null && Math.round((t - prev) / 86400000) === 1 ? run + 1 : 1;
+    prev = t; streak = Math.max(streak, run);
+  }
+  return {
+    answers: count('answers'), moods: count('moods'), games: count('games') + count('likely'),
+    hugs: Object.values(d.hugs || {}).reduce((n, e) => n + (e[slot]?.items?.length || 0), 0),
+    wins: Object.values(d.wordplays || {}).filter((e) => e[slot]?.result === 'win').length,
+    buys: (d.owned?.[slot] || []).length, streak,
+  };
+}
+export const achievementBonus = (m) => ACHIEVEMENTS.reduce((n, a) => n + (m[a.metric] >= a.goal ? a.reward : 0), 0);
 const spentLocal = (d, slot) => d.spent?.[slot] || 0;
 
 // ---- Datos de ejemplo para el modo demo ----

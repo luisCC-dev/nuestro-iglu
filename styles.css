@@ -291,3 +291,24 @@ main { animation: fadeUp .25s ease-out; }
 
 /* Fondos (para .hero y para la muestra .bg-swatch) */
 @media (max-width: 430px) { .couple span { display: none; } }
+
+/* ---------- v7: cofre y logros ---------- */
+.gift { display: flex; align-items: center; gap: 14px; background: linear-gradient(135deg, #fff6d8, #ffe3ec); }
+.chest { flex: none; width: 74px; height: 74px; border: 0; border-radius: 22px; background: #fff; box-shadow: 0 4px 0 #f0d9a8; font-size: 44px; display: grid; place-items: center; animation: wiggle 2.4s ease-in-out infinite; }
+.chest.opening { animation: shake .75s ease-in-out; }
+@keyframes wiggle { 0%, 80%, 100% { transform: rotate(0); } 85% { transform: rotate(-8deg); } 90% { transform: rotate(8deg); } 95% { transform: rotate(-4deg); } }
+@keyframes shake { 0% { transform: scale(1); } 30% { transform: scale(1.15) rotate(-10deg); } 60% { transform: scale(1.2) rotate(10deg); } 100% { transform: scale(1.4); opacity: 0; } }
+.gift-done { text-align: center; font-weight: 700; color: #3d4d63; margin: -4px 0 14px; font-size: 14px; }
+.achs { display: grid; gap: 8px; margin-top: 8px; }
+.ach { display: grid; grid-template-columns: 40px 1fr auto; gap: 10px; align-items: center; padding: 10px; border-radius: 16px; background: var(--soft); opacity: .85; }
+.ach.ok { background: #fff3c4; opacity: 1; }
+.ach-ico { font-size: 26px; text-align: center; filter: grayscale(.7); }
+.ach.ok .ach-ico { filter: none; }
+.ach-txt b { display: block; font-size: 14px; }
+.ach-txt span { display: block; font-size: 12px; color: var(--muted); font-weight: 600; }
+.bar { height: 6px; border-radius: 99px; background: #e2ddd2; margin-top: 6px; overflow: hidden; }
+.bar i { display: block; height: 100%; background: var(--primary); border-radius: 99px; }
+.ach.ok .bar i { background: #e0a800; }
+.ach-rew { text-align: right; font-weight: 900; font-size: 13px; }
+.ach-rew small { display: block; font-size: 11px; color: var(--muted); font-weight: 700; }
+@media (prefers-reduced-motion: reduce) { .chest { animation: none; } }
