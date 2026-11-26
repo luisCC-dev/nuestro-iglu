@@ -1,5 +1,6 @@
 import { store, dateKey, addDays, dayNumber } from './store.js';
 import { penguin, MOODS, moodById, setStyles } from './penguins.js';
+import { scene, bgSwatch } from './scene.js';
 import { QUESTIONS, THIS_OR_THAT, ROUND_SIZE, HUGS, LIKELY, LIKELY_SIZE, SHOP, SHOP_CATS, itemById, EARN } from './content.js';
 
 const root = document.getElementById('app');
@@ -160,18 +161,15 @@ function greeting() {
 function hero() {
   const k = today(), m = ui.data.moods[k] || {}, s = streak();
   const hr = new Date().getHours(), night = hr >= 21 || hr < 6;
-  const bg = ui.data.bg ? 'bg-' + ui.data.bg.split(':')[1] : night ? 'night' : '';
-  return `<section class="hero ${bg}">
-    <div class="hero-text">
+  return scene({
+    bg: ui.data.bg, night,
+    top: `<div class="hero-text">
       <p class="hello">${greeting()}, ${name(ui.me)}</p>
       <p class="date">${cap(fmtDate(k))}</p>
       <span class="streak-chip">🔥 ${s} ${s === 1 ? 'día' : 'días'} de racha</span>
-    </div>
-    <div class="floe">
-      <div class="duo">${penguin('a', m.a?.mood || 'feliz', 84, 'bob')}${penguin('b', m.b?.mood || 'amor', 84, 'bob delay')}</div>
-      <div class="ice"></div>
-    </div>
-  </section>`;
+    </div>`,
+    duo: penguin('a', m.a?.mood || 'feliz', 84, 'bob') + penguin('b', m.b?.mood || 'amor', 84, 'bob delay'),
+  });
 }
 
 const hugById = (id) => HUGS.find((h) => h[0] === id) || HUGS[0];
@@ -681,7 +679,7 @@ function viewShop() {
   const items = SHOP.filter((i) => i.id.startsWith(cat + ':')).map((i) => {
     const has = owned.includes(i.id), on = equipped(i.id);
     const art = cat === 'bg'
-      ? `<span class="bg-swatch bg-${i.id.split(':')[1]}"></span>`
+      ? bgSwatch(i.id)
       : penguin(me, 'feliz', 64, '', { ...mine, [cat]: i.id });
     return `<button class="item ${ui.shopSel === i.id ? 'sel' : ''}" data-action="shop-sel" data-item="${i.id}" aria-pressed="${ui.shopSel === i.id}">
       ${art}<b>${esc(i.name)}</b>
@@ -691,10 +689,8 @@ function viewShop() {
 
   return `<h1 class="page">Tienda</h1>
     <p class="lead">Viste a tu pingüino y decorad vuestro iglú.${cat === 'bg' ? ' El fondo lo veis los dos.' : ''}</p>
-    <section class="hero stage ${bgId ? 'bg-' + bgId.split(':')[1] : ''}">
-      <span class="wallet">🪙 ${ui.data.wallet}</span>
-      <div class="floe"><div class="duo">${penguin(me, 'feliz', 92, 'bob', preview)}${penguin(ot, 'amor', 72, 'bob delay')}</div><div class="ice"></div></div>
-    </section>
+    ${scene({ bg: bgId, cls: 'stage', top: `<span class="wallet">🪙 ${ui.data.wallet}</span>`,
+      duo: penguin(me, 'feliz', 92, 'bob', preview) + penguin(ot, 'amor', 72, 'bob delay') })}
     <div class="shop-action">${action}</div>
     <div class="cats" role="tablist">${SHOP_CATS.map(([id, label, e]) =>
       `<button class="cat ${cat === id ? 'on' : ''}" role="tab" aria-selected="${cat === id}" data-action="shop-cat" data-cat="${id}">${e} ${label}</button>`).join('')}</div>
