@@ -356,8 +356,16 @@ function viewDiary() {
         <b>${moodById(theirs.mood)?.label}</b>${theirs.note ? `<p>${esc(theirs.note)}</p>` : ''}</div>`
     : `<div class="locked">${penguin(ot, null, 48)}<p>${name(ot)} aún no ha escrito su día.</p></div>`;
 
+  const hr = new Date().getHours();
+  const moodOf = (w) => (w === me ? sel : theirs?.mood) || null;
+  const label = (w) => moodById(moodOf(w))?.label;
   return `<h1 class="page">Nuestro diario</h1>
     <p class="lead">Cómo os habéis sentido cada día.</p>
+    ${scene({
+      bg: ui.data.bg, night: hr >= 21 || hr < 6, cls: 'stage diary-scene',
+      top: `<div class="mood-tags">${['a', 'b'].map((w) => `<span class="mood-tag" style="${moodOf(w) ? `background:${moodById(moodOf(w)).color}` : ''}">${w === me ? 'Tú' : name(w)}: ${label(w) || '…'}</span>`).join('')}</div>`,
+      duo: penguin('a', moodOf('a'), 84, 'bob') + penguin('b', moodOf('b'), 84, 'bob delay'),
+    })}
     <article class="card"><h2>Tu día · ${fmtDate(k, { day: 'numeric', month: 'long' })}</h2>${mineHtml}</article>
     <article class="card"><h2>El día de ${name(ot)}</h2>${theirsHtml}</article>
     ${calendar()}`;

@@ -22,6 +22,7 @@ Abrir http://localhost:8765 (los módulos JS no funcionan abriendo el archivo co
 - Hecho v4: menú de juegos (#juego/esto, #juego/quien, #juego/palabra). "¿Quién es más probable?" (kind likely, oculto hasta jugar los dos). "Palabra secreta" (kind word + wordplay, 6 fallos, el hielo se derrite). Migración supabase/003_juegos.sql (ya ejecutada).
 - Hecho v5: avisos push. sw.js + Ajustes > Avisos (hora del recordatorio, prueba, desactivar). Edge Function `push` (supabase/functions/push, Verify JWT OFF, claves VAPID autogeneradas en push_config). Trigger entries_notify (pg_net) + cron iglu-daily cada hora. SQL 004 y 005 ya ejecutados. iPhone: requiere app en pantalla de inicio (iOS 16.4+).
 - Hecho v6: monedas + tienda. Monedas calculadas en BD (coins_earned, my_wallet); compras con buy_item, equipar con equip_item (members.style, couples.bg compartido). Catálogo en js/content.js SHOP = precios de shop_price en 006_tienda.sql (mantener iguales). Dibujos en js/penguins.js. SQL 006 ya ejecutado.
-- Ideas: más objetos, estadísticas de juegos.
+- Hecho v7: cofre diario (kind gift, gift_amount en BD) y logros con premio (achievement_bonus, ACHIEVEMENTS en content.js). Escena separada en js/scene.js + css/scene.css (iglú, fondos con decorado, borde de luz en pingüinos; hecho por agente Sonnet). Iglú en Diario refleja la emoción al elegirla. SQL 007 ya ejecutado.
+- Ideas: ver propuestas en el chat.
 
 Archivos: `index.html`, `styles.css`, `js/app.js` (pantallas), `js/store.js` (datos), `js/config.js`, `js/penguins.js` (dibujos), `js/content.js` (preguntas), `supabase/schema.sql`.

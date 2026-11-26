@@ -101,21 +101,34 @@ function accessory(look, style = {}) {
       <circle r="4" fill="${look.accent}" stroke="#fff" stroke-opacity=".5" stroke-width="1.2"/></g>`;
 }
 
+// ---- Color: mezcla con blanco/negro y luminancia (para borde y sombreado) ----
+function rgb(hex) { const n = parseInt(hex.slice(1), 16); return [n >> 16 & 255, n >> 8 & 255, n & 255]; }
+function mix(hex, to, t) {
+  const c = rgb(hex), d = to === 'w' ? 255 : 0;
+  return '#' + c.map((v) => Math.round(v + (d - v) * t).toString(16).padStart(2, '0')).join('');
+}
+const lum = (hex) => { const [r, g, b] = rgb(hex); return (0.299 * r + 0.587 * g + 0.114 * b) / 255; };
+let UID = 0; // ids únicos por SVG (hay muchos pingüinos en una página)
+
 // who: 'a' | 'b'; mood: id or null; size en px.
 export function penguin(who, mood = null, size = 96, extraClass = '', styleOverride = null) {
   const style = styleOverride || STYLES[who] || {};
   const base = LOOKS[who] || LOOKS.a;
   const look = { ...base, body: BODY_COLORS[style.color] || base.body };
+  const id = 'pg' + (++UID), dark = lum(look.body) < 0.42;
+  const hi = mix(look.body, 'w', dark ? 0.3 : 0.2), lo = mix(look.body, 'k', 0.14);
+  const rim = mix(look.body, 'w', dark ? 0.68 : 0.55), flip = mix(look.body, 'w', dark ? 0.16 : 0.1);
   return `<svg class="penguin ${extraClass}" viewBox="0 0 120 120" width="${size}" height="${size}" aria-hidden="true">
-    <ellipse cx="60" cy="114" rx="30" ry="4" fill="#000" opacity=".08"/>
+    <defs><radialGradient id="${id}" cx=".34" cy=".26" r=".85"><stop offset="0" stop-color="${hi}"/><stop offset=".55" stop-color="${look.body}"/><stop offset="1" stop-color="${lo}"/></radialGradient></defs>
+    <ellipse cx="60" cy="114" rx="32" ry="4.5" fill="#0b1a33" opacity=".16"/>
     <ellipse cx="47" cy="110" rx="9" ry="4.5" fill="#ffa63d"/>
     <ellipse cx="73" cy="110" rx="9" ry="4.5" fill="#ffa63d"/>
-    <ellipse cx="22" cy="78" rx="8" ry="18" transform="rotate(22 22 78)" fill="${look.body}"/>
-    <ellipse cx="98" cy="78" rx="8" ry="18" transform="rotate(-22 98 78)" fill="${look.body}"/>
-    <ellipse cx="60" cy="68" rx="38" ry="42" fill="${look.body}"/>
+    <ellipse cx="22" cy="78" rx="8" ry="18" transform="rotate(22 22 78)" fill="${flip}" stroke="${rim}" stroke-width="2.2"/>
+    <ellipse cx="98" cy="78" rx="8" ry="18" transform="rotate(-22 98 78)" fill="${flip}" stroke="${rim}" stroke-width="2.2"/>
+    <ellipse cx="60" cy="68" rx="38" ry="42" fill="url(#${id})" stroke="${rim}" stroke-width="2.6"/>
     <ellipse cx="60" cy="88" rx="25" ry="20" fill="#fff8ee"/>
     <ellipse cx="60" cy="61" rx="27" ry="21" fill="#fff8ee"/>
-    <ellipse cx="48" cy="34" rx="9" ry="5" fill="#fff" opacity=".12"/>
+    <ellipse cx="46" cy="33" rx="11" ry="5" fill="#fff" opacity=".22" transform="rotate(-18 46 33)"/>
     <circle cx="39" cy="68" r="5" fill="#ff8fa8" opacity=".45"/>
     <circle cx="81" cy="68" r="5" fill="#ff8fa8" opacity=".45"/>
     ${eyes(mood)}
