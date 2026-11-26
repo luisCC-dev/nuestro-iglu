@@ -3,6 +3,7 @@ import { penguin, MOODS, moodById, setStyles } from './penguins.js';
 import { scene, bgSwatch } from './scene.js';
 import { drawAll, replay, mountPad, pointCount } from './draw.js';
 import * as fx from './anim.js';
+import { sfx, soundOn, setSound } from './sfx.js';
 import { QUESTIONS, THIS_OR_THAT, ROUND_SIZE, HUGS, LIKELY, LIKELY_SIZE, SHOP, SHOP_CATS, itemById, EARN, ACHIEVEMENTS, levelOf, weekChallenges, CHALLENGE_REWARD, LEVELS, FISH, CASTS_PER_DAY, DRAW_WORDS, DRAW_TRIES, DRAW_COLORS } from './content.js';
 
 const root = document.getElementById('app');
@@ -46,6 +47,7 @@ function roundFor(key) {
 }
 
 function toast(msg) {
+  if (/^⭐/.test(msg)) sfx('levelup'); else if (/^(🏆|🎯)/.test(msg)) sfx('fanfare');
   const t = document.getElementById('toast');
   t.textContent = msg;
   t.classList.add('show');
@@ -231,6 +233,7 @@ function showHug(from, h) {
   const [id, e, , phrase] = hugById(h.type);
   const el = document.createElement('div');
   el.className = 'hug-overlay';
+  sfx('love');
   el.setAttribute('role', 'dialog');
   el.setAttribute('aria-label', `${name(from)} ${phrase}`);
   el.innerHTML = `<div class="hug-pop">
@@ -330,6 +333,7 @@ function plansCard() {
 }
 
 function confetti() {
+  sfx('success');
   const el = document.createElement('div');
   el.className = 'confetti';
   el.innerHTML = Array.from({ length: 18 }, (_, i) => `<i style="left:${(i * 37) % 100}%;animation-delay:${(i % 6) * 0.08}s">${['🎉', '💖', '✨', '🐧'][i % 4]}</i>`).join('');
@@ -1057,6 +1061,7 @@ function viewUs() {
     ${achievementsCard()}
     <article class="card">
       <h2>Ajustes</h2>
+      <button class="btn secondary" data-action="sound-toggle" aria-pressed="${soundOn()}">${soundOn() ? '🔊 Sonidos: activados' : '🔇 Sonidos: desactivados'}</button>
       ${store.cloud
         ? `<p class="hint mt0">Vuestros datos se guardan en vuestra base de datos privada y solo los veis vosotros dos.</p>
            <div id="push-box" class="push-box"><p class="hint mt0">Cargando avisos…</p></div>
@@ -1174,6 +1179,7 @@ function checkPresents() {
 }
 
 function coinPop(n) {
+  sfx(n >= 10 ? 'coins' : 'coin');
   const el = document.createElement('div');
   el.className = 'coin-pop';
   el.textContent = `+${n} 🪙`;
@@ -1293,6 +1299,8 @@ async function render() {
 root.addEventListener('submit', async (e) => {
   e.preventDefault();
   const f = e.target, kind = f.dataset.form, fd = new FormData(f);
+  const SUBMIT_SFX = { hug: 'kiss', answer: 'pop', mood: 'pop', word: 'whoosh', plan: 'pop', date: 'pop', capsule: 'paper', 'gift-item': 'buy', auth: 'tap', create: 'success', join: 'success' };
+  if (SUBMIT_SFX[kind]) sfx(SUBMIT_SFX[kind]);
   const btn = f.querySelector('button[type=submit]');
   const btnPt = btn ? fx.center(btn) : null; // para efectos que salen del botón
   if (btn) btn.disabled = true;
@@ -1325,6 +1333,7 @@ root.addEventListener('submit', async (e) => {
       if (!pd || !g) { if (btn) btn.disabled = false; return; }
       const tries = [...(pd.play?.tries || []), g];
       const ok = sameWord(g, pd.word);
+      if (!ok) sfx('fail');
       const result = ok ? 'win' : tries.length >= DRAW_TRIES ? 'lose' : null;
       await store.save('drawguess', pd.day, ui.me, { tries, result });
       fx.after(() => {
@@ -1425,6 +1434,14 @@ root.addEventListener('click', async (e) => {
   const el = e.target.closest('[data-action]');
   if (!el) return;
   const a = el.dataset.action;
+  const CLICK_SFX = {
+    gift: 'chest', 'hug-pick': 'pop', 'pick-mood': 'pop', 'shop-sel': 'pop', 'shop-cat': 'tap', 'shop-for': 'tap',
+    'shop-buy': 'buy', 'shop-equip': 'pop', choose: 'tap', 'lk-pick': 'tap', letter: 'key', 'fish-cast': 'whoosh',
+    'draw-pick': 'pop', 'draw-color': 'tap', 'draw-size': 'tap', 'draw-undo': 'swish', 'draw-clear': 'swish', 'draw-send': 'whoosh',
+    'capsule-open': 'paper', 'switch-me': 'tap', 'cal-day': 'tap', 'cal-prev': 'swish', 'cal-next': 'swish', 'edit-mood': 'tap',
+    'plan-del': 'swish', 'date-del': 'swish', 'capsule-del': 'swish', 'push-test': 'tap', 'sound-toggle': null,
+  };
+  if (CLICK_SFX[a]) sfx(CLICK_SFX[a]);
   if (a === 'switch-me') {
     ui.me = other(ui.me); store.setMe(ui.me); ui.lastWallet = null; ui.shopSel = null;
     ui.game = null; ui.editMood = false; ui.draftMood = null;
@@ -1481,6 +1498,7 @@ root.addEventListener('click', async (e) => {
     cancelAnimationFrame(ui.fishRaf);
     const pos = st.pos ?? 0;
     st.ok = pos >= st.zoneStart && pos <= st.zoneStart + st.fish.zone;
+    sfx('reel'); setTimeout(() => sfx(st.ok ? 'splash' : 'fail'), 180);
     st.phase = 'result';
     const pondEl = document.querySelector('.pond'), pc = pondEl ? fx.center(pondEl) : null;
     if (pc && st.ok) { fx.setCoinOrigin({ x: pc.x, y: pc.y - 30 }); fx.burst(pc.x, pc.y, { emojis: ['💦', '✨', '💧'], n: 12, r: 70, size: 18 }); }
@@ -1538,6 +1556,7 @@ root.addEventListener('click', async (e) => {
     try { a === 'plan-del' ? await store.deletePlan(el.dataset.id) : await store.deleteDate(el.dataset.id); }
     catch (err) { toast(errText(err)); return; }
   }
+  if (a === 'sound-toggle') { setSound(!soundOn()); if (soundOn()) sfx('pop'); }
   if (a === 'shop-for') {
     ui.shopFor = el.dataset.for; ui.shopSel = null;
     fx.after(() => { fx.pop(fx.$('.for-toggle .cat.on'), 380); fx.$$('.stage .duo .penguin').forEach((p, i) => fx.slideIn(p, { x: i ? 26 : -26, y: 0, dur: 420 })); });
@@ -1626,6 +1645,7 @@ root.addEventListener('click', async (e) => {
     const guessed = (pw.play?.guessed || '') + L;
     const st = wordState(pw.word, guessed);
     const result = st.solved ? 'win' : st.lost ? 'lose' : null;
+    if (!pw.word.includes(L)) sfx(result === 'lose' ? 'splash' : 'fail');
     try { await store.save('wordplay', pw.day, ui.me, { guessed, result }); }
     catch (err) { toast(errText(err)); return; }
     fx.after(() => {

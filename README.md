@@ -30,6 +30,7 @@ Abrir http://localhost:8765 (los módulos JS no funcionan abriendo el archivo co
 - Hecho v12: fechas especiales (tabla special_dates, anual o única, chip de cuenta atrás en la escena de Hoy) y planes juntos (tabla plans, +20 XP por plan, máx. 2/semana con plans_xp). Enlace demo directo: ?demo. SQL 012 ya ejecutado.
 - Hecho v13: cápsula del tiempo (tabla capsules sin lectura directa; rpc list_capsules devuelve el texto solo si ya se puede abrir o es tuya; open_capsule; aviso en Hoy; sobre animado). SQL 013 ya ejecutado.
 - Hecho v14: animaciones en casi todas las acciones (agente Sonnet): js/anim.js (Web Animations, after()/flush() tras render, monedas que vuelan al contador, partículas) + css/anim.css (entrada de pantallas, toast, pesca, juegos, sobres). Todo desactivado con prefers-reduced-motion. Probado por agente Haiku (5 comprobaciones).
+- Hecho v15: efectos de sonido sintetizados (js/sfx.js, Web Audio, sin archivos). Mapas CLICK_SFX y SUBMIT_SFX en app.js + toasts/monedas/confeti/mimos/pesca/fallos. Interruptor en Ajustes (localStorage iglu-sound). Probado por Haiku.
 - Ideas pendientes: hundir la flota, ¿cuánto me conoces?, tres en raya, hundir la flota, ¿cuánto me conoces?, tres en raya.
 
 Archivos: `index.html`, `styles.css`, `js/app.js` (pantallas), `js/store.js` (datos), `js/config.js`, `js/penguins.js` (dibujos), `js/content.js` (preguntas), `supabase/schema.sql`.
