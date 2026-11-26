@@ -117,6 +117,11 @@ function viewAuth() {
 
 function viewCouple() {
   return `<section class="setup">${intro()}
+    <div class="card who-card">
+      <p class="mt0">Has entrado como <b>${esc(store.email || '')}</b>, y esta cuenta todavía no tiene iglú.</p>
+      <p class="hint mt0">¿Ya tenías un iglú? Seguramente lo creaste con <b>otro email</b>. Sal y entra con ese.</p>
+      <button class="btn secondary" data-action="signout">Salir y entrar con otro email</button>
+    </div>
     <form class="card" data-form="create">
       <h2>Crear nuestro iglú</h2>
       <p class="hint mt0">Para el primero de los dos. Te daremos un código para tu pareja.</p>

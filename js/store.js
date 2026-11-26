@@ -47,6 +47,7 @@ export const store = {
     }
     const { data: { session } } = await sb.auth.getSession();
     if (!session) return 'signed-out';
+    this.email = session.user.email || '';
     const { data } = await sb.from('members').select('slot, couple_id, name').eq('user_id', session.user.id).maybeSingle();
     member = data;
     return member ? 'ready' : 'no-couple';
