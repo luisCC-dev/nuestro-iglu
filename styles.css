@@ -273,3 +273,10 @@ main { animation: fadeUp .25s ease-out; }
 .key.ok { background: #bfe6c9; box-shadow: none; }
 .key.no { background: #f3d6cf; color: #9a5446; box-shadow: none; }
 .key:disabled { cursor: default; }
+
+/* ---------- v5: avisos ---------- */
+.push-box { background: var(--soft); border-radius: 18px; padding: 14px; margin: 4px 0 12px; }
+.push-box .sub { margin: 0 0 6px; font-size: 16px; }
+.push-box .hour { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-weight: 700; margin: 10px 0 4px; }
+.push-box select { min-height: 44px; border: 2px solid var(--line); border-radius: 12px; padding: 0 10px; font: inherit; background: #fff; }
+.steps { margin: 6px 0 0; padding-left: 20px; line-height: 1.6; }

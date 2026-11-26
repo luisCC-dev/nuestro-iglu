@@ -640,6 +640,7 @@ function viewUs() {
       <h2>Ajustes</h2>
       ${store.cloud
         ? `<p class="hint mt0">Vuestros datos se guardan en vuestra base de datos privada y solo los veis vosotros dos.</p>
+           <div id="push-box" class="push-box"><p class="hint mt0">Cargando avisos…</p></div>
            <button class="btn secondary" data-action="signout">Cerrar sesión</button>
            <button class="btn danger" data-action="delete-iglu">Eliminar nuestro iglú</button>
            <p class="hint">Borra el iglú con las respuestas, el diario, las partidas y los mimos de los dos. Vuestras cuentas siguen existiendo y podéis crear otro iglú.</p>`
@@ -649,6 +650,58 @@ function viewUs() {
           : `<p class="hint mt0">Modo prueba: los datos se guardan solo en este dispositivo. Usa el botón “Eres …” de arriba para cambiar de persona.</p>
              <button class="btn secondary" data-action="reset">Borrar todo y empezar de nuevo</button>`}
     </article>`;
+}
+
+// ---------- avisos push ----------
+const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+const standalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+const swReg = ('serviceWorker' in navigator) ? navigator.serviceWorker.register('sw.js').catch(() => null) : Promise.resolve(null);
+const b64ToU8 = (b) => { const p = '='.repeat((4 - (b.length % 4)) % 4); const r = atob((b + p).replace(/-/g, '+').replace(/_/g, '/')); return Uint8Array.from(r, (c) => c.charCodeAt(0)); };
+const hourOpts = (sel) => Array.from({ length: 24 }, (_, h) => `<option value="${h}" ${h === sel ? 'selected' : ''}>${String(h).padStart(2, '0')}:00</option>`).join('');
+
+async function fillPush() {
+  const box = document.getElementById('push-box');
+  if (!box) return;
+  const head = '<h3 class="sub">🔔 Avisos</h3>';
+  if (!('PushManager' in window) || !('Notification' in window)) {
+    box.innerHTML = head + (isIOS && !standalone
+      ? `<p class="hint mt0">En iPhone los avisos solo funcionan con la app en la pantalla de inicio:</p>
+         <ol class="steps"><li>Abre esta página en <b>Safari</b>.</li><li>Pulsa <b>Compartir</b> (el cuadrado con la flecha).</li><li>Elige <b>Añadir a pantalla de inicio</b>.</li><li>Abre el iglú desde el icono nuevo y vuelve aquí.</li></ol>`
+      : '<p class="hint mt0">Este navegador no permite avisos. Prueba con Chrome, Edge o Safari actualizados.</p>');
+    return;
+  }
+  if (Notification.permission === 'denied') {
+    box.innerHTML = head + '<p class="hint mt0">Has bloqueado los avisos para esta web. Actívalos en los ajustes del navegador (permisos del sitio → Notificaciones) y vuelve aquí.</p>';
+    return;
+  }
+  const reg = await swReg;
+  const sub = reg && await reg.pushManager.getSubscription();
+  const row = sub && await store.getPush(sub.endpoint).catch(() => null);
+  if (!sub || !row) {
+    box.innerHTML = head + `<p class="hint mt0">Te avisamos a diario si aún no has respondido, y cuando ${name(other(ui.me))} responda, juegue o te mande un mimo.</p>
+      <label class="hour">Recordatorio diario a las <select id="push-hour">${hourOpts(21)}</select></label>
+      <button class="btn" data-action="push-on">Activar avisos en este móvil</button>`;
+  } else {
+    box.innerHTML = head + `<p class="hint mt0">✅ Avisos activados en este móvil.</p>
+      <label class="hour">Recordatorio diario a las <select id="push-hour" data-action-change="push-hour">${hourOpts(row.remind_hour)}</select></label>
+      <div class="row" style="gap:8px;margin-top:4px"><button class="btn secondary small" data-action="push-test">Enviar prueba</button><button class="btn secondary small" data-action="push-off">Desactivar</button></div>`;
+  }
+}
+
+async function pushOn() {
+  const hour = Number(document.getElementById('push-hour')?.value ?? 21);
+  const perm = await Notification.requestPermission();
+  if (perm !== 'granted') { toast('Sin permiso no podemos avisarte.'); fillPush(); return; }
+  const reg = await swReg;
+  if (!reg) { toast('No se pudo preparar los avisos en este navegador.'); return; }
+  const key = await store.pushKey();
+  let sub = await reg.pushManager.getSubscription();
+  if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64ToU8(key) });
+  const j = sub.toJSON();
+  await store.savePush({ endpoint: j.endpoint, p256dh: j.keys.p256dh, auth: j.keys.auth, remind_hour: hour, tz: Intl.DateTimeFormat().resolvedOptions().timeZone || 'Europe/Madrid' });
+  await store.testPush(j.endpoint).catch(() => {});
+  toast('¡Avisos activados! Te hemos mandado uno de prueba.');
+  fillPush();
 }
 
 // ---------- render ----------
@@ -682,6 +735,7 @@ async function render() {
   const fn = views[view] || viewToday;
   root.innerHTML = header() + `<main>${fn()}</main>` + tabs(views[view] ? view : 'hoy');
   if (!document.querySelector('.hug-overlay')) checkNewHug();
+  if (view === 'nosotros' && store.cloud) fillPush();
 }
 
 // ---------- eventos ----------
@@ -751,6 +805,19 @@ root.addEventListener('click', async (e) => {
     toast(`Ahora eres ${name(ui.me)} (modo prueba)`);
     return;
   }
+  if (a === 'push-on' || a === 'push-test' || a === 'push-off') {
+    el.disabled = true;
+    try {
+      if (a === 'push-on') await pushOn();
+      else {
+        const sub = await (await swReg)?.pushManager.getSubscription();
+        if (sub && a === 'push-test') { await store.testPush(sub.endpoint); toast('Aviso de prueba enviado 🔔'); }
+        if (sub && a === 'push-off') { await store.deletePush(sub.endpoint); await sub.unsubscribe(); toast('Avisos desactivados'); }
+        fillPush();
+      }
+    } catch (err) { toast(errText(err)); fillPush(); }
+    return;
+  }
   if (a === 'demo') { store.enterDemo(); return; }
   if (a === 'exit-demo') { store.exitDemo(); return; }
   if (a === 'hug-pick') ui.hugPick = ui.hugPick === el.dataset.hug ? null : el.dataset.hug;
@@ -811,6 +878,16 @@ root.addEventListener('click', async (e) => {
     await store.reset(); ui.me = 'a'; ui.game = null;
   }
   render();
+});
+
+root.addEventListener('change', async (e) => {
+  if (e.target.id !== 'push-hour' || !e.target.dataset.actionChange) return;
+  try {
+    const sub = await (await swReg)?.pushManager.getSubscription();
+    const j = sub.toJSON();
+    await store.savePush({ endpoint: j.endpoint, p256dh: j.keys.p256dh, auth: j.keys.auth, remind_hour: Number(e.target.value), tz: Intl.DateTimeFormat().resolvedOptions().timeZone || 'Europe/Madrid' });
+    toast(`Recordatorio a las ${String(e.target.value).padStart(2, '0')}:00`);
+  } catch (err) { toast(errText(err)); }
 });
 
 window.addEventListener('hashchange', () => { ui.editMood = false; ui.draftMood = null; ui.lk = null; render(); window.scrollTo(0, 0); });

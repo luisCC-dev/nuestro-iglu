@@ -89,6 +89,22 @@ export const store = {
   async signIn(email, password) { const { error } = await sb.auth.signInWithPassword({ email, password }); if (error) throw error; },
   async signOut() { await sb.auth.signOut(); member = null; },
   async createCouple(name) { const { data, error } = await sb.rpc('create_couple', { p_name: name }); if (error) throw error; return data; },
+  // ---- avisos push (solo cloud) ----
+  async fn(body) {
+    const r = await fetch(`${SUPABASE_URL}/functions/v1/push`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(j.error || `push ${r.status}`);
+    return j;
+  },
+  async pushKey() { return (await this.fn({ mode: 'key' })).publicKey; },
+  async savePush(row) {
+    const { data: { session } } = await sb.auth.getSession();
+    const { error } = await sb.from('push_subs').upsert({ ...row, user_id: session.user.id, couple_id: member.couple_id, slot: member.slot });
+    if (error) throw error;
+  },
+  async getPush(endpoint) { const { data } = await sb.from('push_subs').select('remind_hour').eq('endpoint', endpoint).maybeSingle(); return data; },
+  async deletePush(endpoint) { await sb.from('push_subs').delete().eq('endpoint', endpoint); },
+  async testPush(endpoint) { return this.fn({ mode: 'test', endpoint }); },
   async deleteCouple() {
     if (!CLOUD) { localStorage.removeItem(KEY); localStorage.removeItem(ME_KEY); return; }
     const { error } = await sb.rpc('delete_my_couple'); if (error) throw error; member = null;
