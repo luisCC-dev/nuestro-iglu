@@ -56,6 +56,7 @@ export const store = {
       const d = loadLocal(), mon = mondayOf(dateKey());
       d.wallet = coinsEarned(d, this.getMe()) - spentLocal(d, this.getMe());
       d.xp = coupleXp(d);
+      d.presents = (d.giftsIn || []).filter((g) => g.to === this.getMe() && !g.opened);
       d.week = { monday: mon, metrics: weekMetrics(d, mon), claims: d.claims.filter((c) => c.week === mon).map((c) => c.idx) };
       return d;
     }
@@ -63,7 +64,7 @@ export const store = {
       sb.from('members').select('slot, name, style').eq('couple_id', member.couple_id),
       sb.from('entries').select('kind, day, slot, data, updated_at').eq('couple_id', member.couple_id),
       sb.from('couples').select('code, bg').eq('id', member.couple_id).maybeSingle(),
-      sb.from('purchases').select('slot, item').eq('couple_id', member.couple_id),
+      sb.from('purchases').select('slot, item, paid_by, note, opened').eq('couple_id', member.couple_id),
       sb.rpc('my_wallet'),
       sb.rpc('couple_status', { p_monday: mondayOf(dateKey()) }),
     ]);
@@ -71,6 +72,7 @@ export const store = {
     out.names = { a: null, b: null };
     for (const m of ms || []) { out.names[m.slot] = m.name; out.styles[m.slot] = m.style || {}; }
     for (const p of ps || []) out.owned[p.slot].push(p.item);
+    out.presents = (ps || []).filter((p) => p.slot === member.slot && p.opened === false).map((p) => ({ item: p.item, from: p.paid_by, note: p.note }));
     out.code = c?.code;
     out.bg = c?.bg || null;
     out.wallet = w ? w.earned - w.spent : 0;
@@ -139,6 +141,21 @@ export const store = {
     d.owned[me].push(item); (d.spent ||= { a: 0, b: 0 })[me] = (d.spent[me] || 0) + price;
     localStorage.setItem(KEY, JSON.stringify(d));
   },
+  async giftItem(item, price, note) {
+    if (CLOUD) { const { error } = await sb.rpc('gift_item', { p_item: item, p_note: note || '' }); if (error) throw error; return; }
+    const d = loadLocal(), me = this.getMe(), ot = me === 'a' ? 'b' : 'a';
+    if (d.owned[ot].includes(item)) throw new Error('partner owns');
+    if (coinsEarned(d, me) - spentLocal(d, me) < price) throw new Error('not enough coins');
+    d.owned[ot].push(item); (d.spent ||= { a: 0, b: 0 })[me] = (d.spent[me] || 0) + price;
+    (d.giftsIn ||= []).push({ to: ot, item, from: me, note: (note || '').slice(0, 120), opened: false });
+    localStorage.setItem(KEY, JSON.stringify(d));
+  },
+  async openGift(item) {
+    if (CLOUD) { const { error } = await sb.rpc('open_gift', { p_item: item }); if (error) throw error; return; }
+    const d = loadLocal(), me = this.getMe();
+    for (const g of d.giftsIn || []) if (g.to === me && g.item === item) g.opened = true;
+    localStorage.setItem(KEY, JSON.stringify(d));
+  },
   async equip(cat, item) {
     if (CLOUD) { const { error } = await sb.rpc('equip_item', { p_cat: cat, p_item: item }); if (error) throw error; return; }
     const d = loadLocal(), me = this.getMe();
@@ -159,6 +176,7 @@ export const store = {
     sb.channel('entries-' + member.couple_id)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'entries', filter: `couple_id=eq.${member.couple_id}` }, cb)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'members', filter: `couple_id=eq.${member.couple_id}` }, cb)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'purchases', filter: `couple_id=eq.${member.couple_id}` }, cb)
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'couples', filter: `id=eq.${member.couple_id}` }, cb)
       .subscribe();
   },

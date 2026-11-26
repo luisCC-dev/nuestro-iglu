@@ -918,16 +918,26 @@ function viewUs() {
 // ---------- tienda ----------
 function viewShop() {
   const me = ui.me, ot = other(me);
+  const gift = ui.shopFor === 'ot' && ui.data.names?.[ot];
+  const who = gift ? ot : me;
   const cat = ui.shopCat || 'hat';
-  const mine = ui.data.styles[me] || {};
-  const owned = ui.data.owned[me] || [];
+  const style = ui.data.styles[who] || {};
+  const owned = ui.data.owned[who] || [];
   const sel = ui.shopSel && itemById(ui.shopSel)?.id.startsWith(cat + ':') ? itemById(ui.shopSel) : null;
-  const preview = sel && cat !== 'bg' ? { ...mine, [cat]: sel.id } : mine;
+  const preview = sel && cat !== 'bg' ? { ...style, [cat]: sel.id } : style;
   const bgId = sel && cat === 'bg' ? sel.id : ui.data.bg;
-  const equipped = (id) => (cat === 'bg' ? ui.data.bg === id : mine[cat] === id);
+  const equipped = (id) => (cat === 'bg' ? ui.data.bg === id : style[cat] === id);
 
-  let action = '<p class="hint center mt0">Toca un objeto para probártelo.</p>';
-  if (sel) {
+  let action = `<p class="hint center mt0">${gift ? `Toca un objeto para ver cómo le queda a ${name(ot)}.` : 'Toca un objeto para probártelo.'}</p>`;
+  if (sel && gift) {
+    if (owned.includes(sel.id)) action = `<button class="btn" disabled>${name(ot)} ya lo tiene</button>`;
+    else if (ui.data.wallet >= sel.price) {
+      action = `<form data-form="gift-item" class="gift-form">
+        <input name="note" maxlength="120" autocomplete="off" placeholder="Escribe una nota (opcional)" aria-label="Nota del regalo">
+        <button class="btn" type="submit">🎁 Regalar ${esc(sel.name.toLowerCase())} por 🪙 ${sel.price}</button>
+      </form>`;
+    } else action = `<button class="btn" disabled>Te faltan 🪙 ${sel.price - ui.data.wallet}</button>`;
+  } else if (sel) {
     if (owned.includes(sel.id)) {
       action = equipped(sel.id)
         ? `<button class="btn secondary" data-action="shop-equip" data-item="">Quitar ${esc(sel.name.toLowerCase())}</button>`
@@ -941,19 +951,23 @@ function viewShop() {
 
   const items = SHOP.filter((i) => i.id.startsWith(cat + ':')).map((i) => {
     const has = owned.includes(i.id), on = equipped(i.id);
-    const art = cat === 'bg'
-      ? bgSwatch(i.id)
-      : penguin(me, 'feliz', 64, '', { ...mine, [cat]: i.id });
+    const art = cat === 'bg' ? bgSwatch(i.id) : penguin(who, 'feliz', 64, '', { ...style, [cat]: i.id });
+    const label = gift ? (has ? 'Ya lo tiene' : `🪙 ${i.price}`) : on ? '✓ Puesto' : has ? 'Tuyo' : `🪙 ${i.price}`;
     return `<button class="item ${ui.shopSel === i.id ? 'sel' : ''}" data-action="shop-sel" data-item="${i.id}" aria-pressed="${ui.shopSel === i.id}">
-      ${art}<b>${esc(i.name)}</b>
-      <span class="price ${has ? 'has' : ''}">${on ? '✓ Puesto' : has ? 'Tuyo' : `🪙 ${i.price}`}</span>
+      ${art}<b>${esc(i.name)}</b><span class="price ${has ? 'has' : ''}">${label}</span>
     </button>`;
   }).join('');
 
+  const duo = gift
+    ? penguin(me, 'feliz', 72, 'bob') + penguin(ot, 'amor', 92, 'bob delay', preview)
+    : penguin(me, 'feliz', 92, 'bob', preview) + penguin(ot, 'amor', 72, 'bob delay');
   return `<h1 class="page">Tienda</h1>
-    <p class="lead">Viste a tu pingüino y decorad vuestro iglú.${cat === 'bg' ? ' El fondo lo veis los dos.' : ''}</p>
-    ${scene({ bg: bgId, cls: 'stage', level: levelOf(ui.data.xp || 0).level, top: `<span class="wallet">🪙 ${ui.data.wallet}</span>`,
-      duo: penguin(me, 'feliz', 92, 'bob', preview) + penguin(ot, 'amor', 72, 'bob delay') })}
+    <p class="lead">${gift ? `Elige un regalo para ${name(ot)}. Lo pagas tú y le llega con tu nota.` : 'Viste a tu pingüino y decorad vuestro iglú.'}${cat === 'bg' ? ' El fondo lo veis los dos.' : ''}</p>
+    ${ui.data.names?.[ot] ? `<div class="for-toggle" role="tablist">
+      <button class="cat ${gift ? '' : 'on'}" role="tab" aria-selected="${!gift}" data-action="shop-for" data-for="me">🐧 Para mí</button>
+      <button class="cat ${gift ? 'on' : ''}" role="tab" aria-selected="${!!gift}" data-action="shop-for" data-for="ot">🎁 Para ${name(ot)}</button>
+    </div>` : ''}
+    ${scene({ bg: bgId, cls: 'stage', level: levelOf(ui.data.xp || 0).level, top: `<span class="wallet">🪙 ${ui.data.wallet}</span>`, duo })}
     <div class="shop-action">${action}</div>
     <div class="cats" role="tablist">${SHOP_CATS.map(([id, label, e]) =>
       `<button class="cat ${cat === id ? 'on' : ''}" role="tab" aria-selected="${cat === id}" data-action="shop-cat" data-cat="${id}">${e} ${label}</button>`).join('')}</div>
@@ -961,6 +975,45 @@ function viewShop() {
     <details class="card earn"><summary>¿Cómo gano monedas?</summary>
       ${EARN.map(([t, n]) => `<div class="earn-row"><span>${t}</span><b>${n} 🪙</b></div>`).join('')}
     </details>`;
+}
+
+// Paquete sorpresa al recibir un regalo
+function checkPresents() {
+  const pr = ui.data.presents?.[0];
+  if (!pr || document.querySelector('.present-overlay, .hug-overlay')) return;
+  const it = itemById(pr.item);
+  if (!it) return;
+  const cat = it.id.split(':')[0], me = ui.me;
+  const el = document.createElement('div');
+  el.className = 'hug-overlay present-overlay';
+  el.setAttribute('role', 'dialog');
+  el.setAttribute('aria-label', `Regalo de ${name(pr.from)}`);
+  el.innerHTML = `<div class="hug-pop">
+    <p class="label" style="margin:0">Regalo de ${name(pr.from)}</p>
+    <button class="box" data-open aria-label="Abrir el regalo">🎁</button>
+    <p class="hint mt0">Toca el paquete para abrirlo</p>
+  </div>`;
+  el.addEventListener('click', async (ev) => {
+    if (ev.target.closest('[data-open]')) {
+      const box = el.querySelector('.box');
+      box.classList.add('opening');
+      await new Promise((r) => setTimeout(r, 700));
+      try { await store.openGift(pr.item); } catch (err) { toast(errText(err)); }
+      const art = cat === 'bg' ? bgSwatch(it.id) : penguin(me, 'amor', 120, '', { ...(ui.data.styles[me] || {}), [cat]: it.id });
+      el.querySelector('.hug-pop').innerHTML = `<div class="reveal">${art}</div>
+        <h2>¡${esc(it.name)}!</h2>
+        ${pr.note ? `<p class="hug-msg">“${esc(pr.note)}”</p>` : `<p class="hint mt0">Un regalo de ${name(pr.from)}</p>`}
+        <button class="btn" data-wear>${cat === 'bg' ? 'Poner este fondo' : '¡Ponérmelo!'}</button>
+        <button class="btn secondary" data-later>Guardar</button>`;
+      return;
+    }
+    if (ev.target.closest('[data-wear]')) {
+      try { await store.equip(cat, it.id); } catch (err) { toast(errText(err)); }
+      el.remove(); ui.spending = true; render(); return;
+    }
+    if (ev.target.closest('[data-later]')) { el.remove(); ui.spending = true; render(); }
+  });
+  document.body.appendChild(el);
 }
 
 function coinPop(n) {
@@ -1035,6 +1088,8 @@ const ERRORS = {
   'not enough coins': 'No tienes monedas suficientes.',
   'already owned': 'Ya lo tienes.',
   'not owned': 'Primero tienes que comprarlo.',
+  'partner owns': 'Tu pareja ya lo tiene.',
+  'no partner': 'Tu pareja aún no ha entrado en el iglú.',
   'not done': 'Ese reto aún no está completo.',
   'bad week': 'Ese reto ya ha caducado.',
 };
@@ -1064,6 +1119,7 @@ async function render() {
   const fn = views[view] || viewToday;
   root.innerHTML = header() + `<main>${fn()}</main>` + tabs(views[view] ? view : 'hoy');
   if (!document.querySelector('.hug-overlay')) checkNewHug();
+  checkPresents();
   if (view === 'nosotros' && store.cloud) fillPush();
   if (view === 'juego' && ui.sub === 'pesca') startReel();
   if (view === 'juego' && ui.sub === 'dibujo') afterDrawRender();
@@ -1107,6 +1163,12 @@ root.addEventListener('submit', async (e) => {
       const result = ok ? 'win' : tries.length >= DRAW_TRIES ? 'lose' : null;
       await store.save('drawguess', pd.day, ui.me, { tries, result });
       toast(ok ? '¡Acertaste! 🎉' : result ? 'Se acabaron los intentos' : '¡No! Te damos una letra de pista');
+    } else if (kind === 'gift-item') {
+      const it = itemById(ui.shopSel);
+      if (!it) return;
+      await store.giftItem(it.id, it.price, (fd.get('note') || '').trim());
+      ui.spending = true; ui.shopSel = null;
+      toast(`🎁 ¡${it.name} enviado a ${name(other(ui.me))}!`);
     } else if (kind === 'hug') {
       const k = today(), list = [...(ui.data.hugs?.[k]?.[ui.me]?.items || [])];
       const type = ui.hugPick;
@@ -1211,6 +1273,7 @@ root.addEventListener('click', async (e) => {
     catch (err) { toast(errText(err)); }
     ui.opening = false;
   }
+  if (a === 'shop-for') { ui.shopFor = el.dataset.for; ui.shopSel = null; }
   if (a === 'shop-cat') { ui.shopCat = el.dataset.cat; ui.shopSel = null; }
   if (a === 'shop-sel') ui.shopSel = ui.shopSel === el.dataset.item ? null : el.dataset.item;
   if (a === 'shop-buy' || a === 'shop-equip') {

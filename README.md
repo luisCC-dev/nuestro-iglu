@@ -26,6 +26,7 @@ Abrir http://localhost:8765 (los módulos JS no funcionan abriendo el archivo co
 - Hecho v8: nivel del iglú (couple_xp, 10 niveles en content.js LEVELS, mejoras dibujadas en scene.js levelExtras) y retos semanales (3 por semana rotando, challenge_goal, claim_challenge: +20 monedas a cada uno y +30 XP). SQL 008 ya ejecutado.
 - Hecho v9: pesca en el hielo (#juego/pesca, kind fish, 5 cañas/día, especie por str_hash igual en JS y SQL, FISH en content.js, logro Pescador, +2 XP por pez). SQL 009 ya ejecutado.
 - Hecho v10: dibuja y adivina (#juego/dibujo, js/draw.js, kinds draw + drawguess, 3 intentos con pista, trazos 0..1000, logro Artista, push redeployada con avisos de dibujos). SQL 010 ya ejecutado.
-- Ideas pendientes: regalos, lista de planes, cuenta atrás, cápsula del tiempo, hundir la flota, ¿cuánto me conoces?, tres en raya.
+- Hecho v11: regalos (Tienda "Para mí / Para pareja", rpc gift_item/open_gift, purchases.paid_by/note/opened, gasto por paid_by con spent_by, paquete sorpresa al abrir, push mode "present" con trigger purchases_notify). SQL 011 ya ejecutado.
+- Ideas pendientes: lista de planes, cuenta atrás, cápsula del tiempo, hundir la flota, ¿cuánto me conoces?, tres en raya.
 
 Archivos: `index.html`, `styles.css`, `js/app.js` (pantallas), `js/store.js` (datos), `js/config.js`, `js/penguins.js` (dibujos), `js/content.js` (preguntas), `supabase/schema.sql`.
