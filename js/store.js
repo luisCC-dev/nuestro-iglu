@@ -14,7 +14,7 @@ let member = null; // { slot, couple_id, name } en modo cloud
 
 // ---------- modo local ----------
 const KEY = DEMO ? 'iglu-demo-v1' : 'iglu-data-v1', ME_KEY = DEMO ? 'iglu-demo-me' : 'iglu-me';
-const empty = () => ({ names: null, answers: {}, moods: {}, games: {}, hugs: {}, likely: {}, words: {}, wordplays: {}, gifts: {}, fish: {}, draws: {}, drawguesses: {}, claims: [], styles: { a: {}, b: {} }, bg: null, owned: { a: [], b: [] } });
+const empty = () => ({ names: null, answers: {}, moods: {}, games: {}, hugs: {}, likely: {}, words: {}, wordplays: {}, gifts: {}, fish: {}, draws: {}, drawguesses: {}, claims: [], plans: [], dates: [], styles: { a: {}, b: {} }, bg: null, owned: { a: [], b: [] } });
 function loadLocal() { try { return { ...empty(), ...JSON.parse(localStorage.getItem(KEY)) }; } catch { return empty(); } }
 function putLocal(kind, date, who, value) {
   const d = loadLocal(), s = SECTION[kind];
@@ -61,13 +61,15 @@ export const store = {
       d.week = { monday: mon, metrics: weekMetrics(d, mon), claims: d.claims.filter((c) => c.week === mon).map((c) => c.idx) };
       return d;
     }
-    const [{ data: ms }, { data: es }, { data: c }, { data: ps }, { data: w }, { data: st }] = await Promise.all([
+    const [{ data: ms }, { data: es }, { data: c }, { data: ps }, { data: w }, { data: st }, { data: pl }, { data: sd }] = await Promise.all([
       sb.from('members').select('slot, name, style').eq('couple_id', member.couple_id),
       sb.from('entries').select('kind, day, slot, data, updated_at').eq('couple_id', member.couple_id),
       sb.from('couples').select('code, bg').eq('id', member.couple_id).maybeSingle(),
       sb.from('purchases').select('slot, item, paid_by, note, opened').eq('couple_id', member.couple_id),
       sb.rpc('my_wallet'),
       sb.rpc('couple_status', { p_monday: mondayOf(dateKey()) }),
+      sb.from('plans').select('*').eq('couple_id', member.couple_id).order('created_at'),
+      sb.from('special_dates').select('*').eq('couple_id', member.couple_id),
     ]);
     const out = empty();
     out.names = { a: null, b: null };
@@ -78,6 +80,8 @@ export const store = {
     out.bg = c?.bg || null;
     out.wallet = w ? w.earned - w.spent : 0;
     out.xp = st?.xp || 0;
+    out.plans = pl || [];
+    out.dates = sd || [];
     out.week = { monday: mondayOf(dateKey()), metrics: st?.week || {}, claims: st?.claims || [] };
     out.full = !!(out.names.a && out.names.b);
     for (const e of es || []) {
@@ -142,6 +146,29 @@ export const store = {
     d.owned[me].push(item); (d.spent ||= { a: 0, b: 0 })[me] = (d.spent[me] || 0) + price;
     localStorage.setItem(KEY, JSON.stringify(d));
   },
+  // ---- planes y fechas especiales ----
+  async addPlan(title, emoji) {
+    if (CLOUD) { const { error } = await sb.from('plans').insert({ title, emoji }); if (error) throw error; return; }
+    const d = loadLocal(); d.plans.push({ id: crypto.randomUUID(), title, emoji, created_by: this.getMe(), created_at: new Date().toISOString(), done_at: null, done_by: null });
+    localStorage.setItem(KEY, JSON.stringify(d));
+  },
+  async setPlanDone(id, done) {
+    const patch = done ? { done_at: new Date().toISOString(), done_by: this.getMe() } : { done_at: null, done_by: null };
+    if (CLOUD) { const { error } = await sb.from('plans').update(patch).eq('id', id); if (error) throw error; return; }
+    const d = loadLocal(); Object.assign(d.plans.find((x) => x.id === id) || {}, patch); localStorage.setItem(KEY, JSON.stringify(d));
+  },
+  async deletePlan(id) {
+    if (CLOUD) { const { error } = await sb.from('plans').delete().eq('id', id); if (error) throw error; return; }
+    const d = loadLocal(); d.plans = d.plans.filter((x) => x.id !== id); localStorage.setItem(KEY, JSON.stringify(d));
+  },
+  async addDate(title, emoji, day, yearly) {
+    if (CLOUD) { const { error } = await sb.from('special_dates').insert({ title, emoji, day, yearly }); if (error) throw error; return; }
+    const d = loadLocal(); d.dates.push({ id: crypto.randomUUID(), title, emoji, day, yearly, created_by: this.getMe() }); localStorage.setItem(KEY, JSON.stringify(d));
+  },
+  async deleteDate(id) {
+    if (CLOUD) { const { error } = await sb.from('special_dates').delete().eq('id', id); if (error) throw error; return; }
+    const d = loadLocal(); d.dates = d.dates.filter((x) => x.id !== id); localStorage.setItem(KEY, JSON.stringify(d));
+  },
   async giftItem(item, price, note) {
     if (CLOUD) { const { error } = await sb.rpc('gift_item', { p_item: item, p_note: note || '' }); if (error) throw error; return; }
     const d = loadLocal(), me = this.getMe(), ot = me === 'a' ? 'b' : 'a';
@@ -177,6 +204,8 @@ export const store = {
     sb.channel('entries-' + member.couple_id)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'entries', filter: `couple_id=eq.${member.couple_id}` }, cb)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'members', filter: `couple_id=eq.${member.couple_id}` }, cb)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'plans', filter: `couple_id=eq.${member.couple_id}` }, cb)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'special_dates', filter: `couple_id=eq.${member.couple_id}` }, cb)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'purchases', filter: `couple_id=eq.${member.couple_id}` }, cb)
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'couples', filter: `id=eq.${member.couple_id}` }, cb)
       .subscribe();
@@ -214,7 +243,17 @@ export function coupleXp(d) {
     n += Object.values(d.draws || {}).filter((e) => e[slot]).length * 3;
     n += Object.values(d.drawguesses || {}).filter((e) => e[slot]?.result).length * 5;
   }
-  return n + 10 * bothDays('answers', d) + 30 * (d.claims || []).length;
+  return n + 10 * bothDays('answers', d) + 30 * (d.claims || []).length + plansXp(d.plans);
+}
+// +20 por plan cumplido, máx. 2 por semana (igual que plans_xp en la BD)
+function plansXp(plans = []) {
+  const perWeek = {};
+  for (const p of plans) {
+    if (!p.done_at || Date.parse(p.done_at) - Date.parse(p.created_at) < 3600000) continue;
+    const w = mondayOf(dateKey(new Date(p.done_at)));
+    perWeek[w] = (perWeek[w] || 0) + 1;
+  }
+  return Object.values(perWeek).reduce((n, c) => n + Math.min(c, 2) * 20, 0);
 }
 export function weekMetrics(d, monday) {
   const end = addDays(monday, 6), inWeek = (k) => k >= monday && k <= end;
@@ -275,6 +314,16 @@ function seedDemo() {
   d.hugs[t] = { b: { items: [{ type: 'abrazo', msg: '¡Buenos días, pingüino!', at: Date.now() - 3600000 }], at: Date.now() } };
   d.likely[t] = { b: { picks: ['a', 'b', 'a', 'a', 'b'], at: Date.now() } };
   d.words[t] = { b: { word: 'CHOCOLATE', clue: 'Lo que siempre me robas', at: Date.now() } };
+  const iso = (k) => new Date(Date.parse(k + 'T10:00:00')).toISOString();
+  d.plans = [
+    { id: 'p1', title: 'Ver un amanecer en la playa', emoji: '🌄', created_by: 'b', created_at: iso(addDays(t, -9)), done_at: null, done_by: null },
+    { id: 'p2', title: 'Cocinar sushi juntos', emoji: '🍣', created_by: 'a', created_at: iso(addDays(t, -6)), done_at: null, done_by: null },
+    { id: 'p3', title: 'Maratón de pelis de Navidad', emoji: '🎬', created_by: 'b', created_at: iso(addDays(t, -8)), done_at: iso(addDays(t, -2)), done_by: 'a' },
+  ];
+  d.dates = [
+    { id: 'd1', title: 'Nuestro aniversario', emoji: '💖', day: addDays(t, 12).replace(/^\d{4}/, '2023'), yearly: true, created_by: 'a' },
+    { id: 'd2', title: 'Escapada a la nieve', emoji: '✈️', day: addDays(t, 40), yearly: false, created_by: 'b' },
+  ];
   const circle = []; for (let i = 0; i <= 36; i++) { const g = (i / 36) * Math.PI * 2; circle.push(Math.round(500 + 170 * Math.cos(g)), Math.round(500 + 170 * Math.sin(g))); }
   const rays = Array.from({ length: 8 }, (_, i) => { const g = (i / 8) * Math.PI * 2; return { c: '#ff9d3d', s: 22, p: [Math.round(500 + 230 * Math.cos(g)), Math.round(500 + 230 * Math.sin(g)), Math.round(500 + 330 * Math.cos(g)), Math.round(500 + 330 * Math.sin(g))] }; });
   d.draws[t] = { b: { word: 'sol', strokes: [{ c: '#ffd23d', s: 44, p: circle }, ...rays, { c: '#1f2a3a', s: 14, p: [430, 460, 432, 462] }, { c: '#1f2a3a', s: 14, p: [570, 460, 572, 462] }, { c: '#1f2a3a', s: 10, p: [420, 560, 460, 600, 500, 610, 540, 600, 580, 560] }], at: Date.now() } };

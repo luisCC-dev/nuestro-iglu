@@ -165,7 +165,7 @@ function hero() {
   const lv = levelOf(ui.data.xp || 0).level;
   return scene({
     bg: ui.data.bg, night, level: lv,
-    top: `<a class="lvl-badge" href="#nosotros" aria-label="Nivel ${lv} del iglú">⭐ Nivel ${lv}</a><div class="hero-text">
+    top: `<a class="lvl-badge" href="#nosotros" aria-label="Nivel ${lv} del iglú">⭐ Nivel ${lv}</a>${countdownChip()}<div class="hero-text">
       <p class="hello">${greeting()}, ${name(ui.me)}</p>
       <p class="date">${cap(fmtDate(k))}</p>
       <span class="streak-chip">🔥 ${s} ${s === 1 ? 'día' : 'días'} de racha</span>
@@ -254,6 +254,81 @@ function giftCard() {
     <button class="chest" data-action="gift" aria-label="Abrir el cofre del día"><span class="lid">🎁</span></button>
     <div><h2 class="mt0">Cofre del día</h2><p class="hint mt0">Ábrelo para ganar entre 3 y 10 monedas. ¡Uno cada día!</p></div>
   </article>`;
+}
+
+// ---------- fechas especiales y planes ----------
+const DATE_EMOJIS = ['💖', '🎂', '💍', '✈️', '🎄', '🎉', '🏠', '⭐', '🐧'];
+const PLAN_EMOJIS = ['✨', '🍣', '🏖️', '🎬', '✈️', '🍳', '🎢', '⛺', '🎨', '💃', '📸', '🌄', '🎮', '🍕'];
+const toKey = (y, m, d) => `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+function nextOccurrence(dt) {
+  if (!dt.yearly) return dt.day;
+  const [, m, d] = dt.day.split('-').map(Number), t = today(), y = Number(t.slice(0, 4));
+  const thisYear = toKey(y, m, d);
+  return thisYear >= t ? thisYear : toKey(y + 1, m, d);
+}
+const daysUntil = (key) => Math.round((Date.parse(key + 'T12:00:00') - Date.parse(today() + 'T12:00:00')) / 86400000);
+function upcomingDates() {
+  return (ui.data.dates || []).map((dt) => { const next = nextOccurrence(dt); return { ...dt, next, left: daysUntil(next) }; })
+    .sort((x, y) => (x.left < 0) - (y.left < 0) || Math.abs(x.left) - Math.abs(y.left));
+}
+const leftText = (n) => (n === 0 ? '¡Es hoy! 🎉' : n === 1 ? 'Mañana' : n > 1 ? `Faltan ${n} días` : `Hace ${-n} días`);
+
+function countdownChip() {
+  const d = upcomingDates().find((x) => x.left >= 0 && x.left <= 60);
+  if (!d) return '';
+  return `<a class="count-chip" href="#nosotros">${d.emoji} ${d.left === 0 ? `¡Hoy: ${esc(d.title)}!` : `${d.left} ${d.left === 1 ? 'día' : 'días'} · ${esc(d.title)}`}</a>`;
+}
+
+function datesCard() {
+  const list = upcomingDates();
+  return `<article class="card">
+    <h2 class="mt0">📅 Fechas especiales</h2>
+    ${list.length ? `<div class="dates">${list.map((d) => `<div class="date-row ${d.left === 0 ? 'today' : d.left < 0 ? 'past' : ''}">
+        <span class="de">${d.emoji}</span>
+        <div><b>${esc(d.title)}</b><small>${fmtDate(d.next, { day: 'numeric', month: 'long', year: 'numeric' })}${d.yearly ? ' · cada año' : ''}</small></div>
+        <span class="left">${leftText(d.left)}</span>
+        <button class="x" data-action="date-del" data-id="${d.id}" aria-label="Borrar ${esc(d.title)}">✕</button>
+      </div>`).join('')}</div>` : '<p class="hint mt0">Añade vuestro aniversario, cumpleaños o la próxima vez que os veáis.</p>'}
+    <details class="add" ${list.length ? '' : 'open'}><summary>+ Añadir fecha</summary>
+      <form data-form="date" class="add-form">
+        <div class="row" style="gap:8px"><select name="emoji" aria-label="Icono">${DATE_EMOJIS.map((e) => `<option>${e}</option>`).join('')}</select>
+          <input name="title" required maxlength="60" placeholder="Ej.: Nuestro aniversario" aria-label="Nombre de la fecha" autocomplete="off"></div>
+        <div class="row" style="gap:8px"><input name="day" type="date" required aria-label="Fecha">
+          <label class="check"><input type="checkbox" name="yearly" checked> Cada año</label></div>
+        <button class="btn" type="submit">Guardar fecha</button>
+      </form>
+    </details>
+  </article>`;
+}
+
+function plansCard() {
+  const plans = ui.data.plans || [];
+  const todo = plans.filter((x) => !x.done_at), done = plans.filter((x) => x.done_at).sort((a, b) => b.done_at.localeCompare(a.done_at));
+  const row = (x) => `<div class="plan ${x.done_at ? 'done' : ''}">
+      <button class="tick" data-action="plan-toggle" data-id="${x.id}" data-done="${x.done_at ? 0 : 1}" aria-label="${x.done_at ? 'Marcar como pendiente' : 'Marcar como hecho'}">${x.done_at ? '✓' : ''}</button>
+      <span class="pe">${x.emoji}</span>
+      <div class="pt"><b>${esc(x.title)}</b><small>${x.done_at ? `Hecho el ${fmtDate(x.done_at.slice(0, 10), { day: 'numeric', month: 'short' })}` : `Idea de ${name(x.created_by)}`}</small></div>
+      <button class="x" data-action="plan-del" data-id="${x.id}" aria-label="Borrar plan">✕</button>
+    </div>`;
+  return `<article class="card">
+    <div class="row space"><h2 class="mt0">💑 Nuestros planes</h2><span class="hint" style="margin:0">${done.length} hechos</span></div>
+    <form data-form="plan" class="add-form row" style="gap:8px">
+      <select name="emoji" aria-label="Icono">${PLAN_EMOJIS.map((e) => `<option>${e}</option>`).join('')}</select>
+      <input name="title" required maxlength="80" placeholder="Algo que queráis hacer juntos" aria-label="Nuevo plan" autocomplete="off">
+      <button class="btn small" type="submit" aria-label="Añadir plan">+</button>
+    </form>
+    ${todo.length ? todo.map(row).join('') : '<p class="hint">Apuntad ideas: ir a la playa, cocinar sushi, ver un amanecer…</p>'}
+    ${done.length ? `<details class="add"><summary>Ver ${done.length} planes cumplidos</summary>${done.map(row).join('')}</details>` : ''}
+    <p class="hint">Cada plan cumplido da +20 puntos al iglú (máx. 2 por semana).</p>
+  </article>`;
+}
+
+function confetti() {
+  const el = document.createElement('div');
+  el.className = 'confetti';
+  el.innerHTML = Array.from({ length: 18 }, (_, i) => `<i style="left:${(i * 37) % 100}%;animation-delay:${(i % 6) * 0.08}s">${['🎉', '💖', '✨', '🐧'][i % 4]}</i>`).join('');
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 1800);
 }
 
 function iglooCard() {
@@ -876,6 +951,8 @@ function viewUs() {
   return `<h1 class="page">Nosotros</h1>
     <p class="lead">Lo activos que estáis y cómo os sentís.</p>
     ${iglooCard()}
+    ${datesCard()}
+    ${plansCard()}
     <article class="card">
       <div class="streak">${penguin('a', s ? 'feliz' : null, 64)}<div><span class="num">${s}</span><div class="label" style="margin:0">${s === 1 ? 'día' : 'días'} de racha</div></div>${penguin('b', s ? 'amor' : null, 64)}</div>
       <p class="hint center">La racha sube cada día que respondéis los dos la pregunta.</p>
@@ -1169,6 +1246,16 @@ root.addEventListener('submit', async (e) => {
       await store.giftItem(it.id, it.price, (fd.get('note') || '').trim());
       ui.spending = true; ui.shopSel = null;
       toast(`🎁 ¡${it.name} enviado a ${name(other(ui.me))}!`);
+    } else if (kind === 'plan') {
+      const title = (fd.get('title') || '').trim();
+      if (!title) return;
+      await store.addPlan(title, fd.get('emoji') || '✨');
+      toast('Plan apuntado 📝');
+    } else if (kind === 'date') {
+      const title = (fd.get('title') || '').trim(), day = fd.get('day');
+      if (!title || !day) return;
+      await store.addDate(title, fd.get('emoji') || '💖', day, fd.get('yearly') === 'on');
+      toast('Fecha guardada 📅');
     } else if (kind === 'hug') {
       const k = today(), list = [...(ui.data.hugs?.[k]?.[ui.me]?.items || [])];
       const type = ui.hugPick;
@@ -1272,6 +1359,16 @@ root.addEventListener('click', async (e) => {
     try { await store.save('gift', today(), ui.me, { opened: true }); toast('¡Cofre abierto! 🎉'); }
     catch (err) { toast(errText(err)); }
     ui.opening = false;
+  }
+  if (a === 'plan-toggle') {
+    const done = el.dataset.done === '1';
+    try { await store.setPlanDone(el.dataset.id, done); if (done) { confetti(); toast('¡Plan cumplido! 🎉'); } }
+    catch (err) { toast(errText(err)); return; }
+  }
+  if (a === 'plan-del' || a === 'date-del') {
+    if (!confirm('¿Borrarlo? Se borra para los dos.')) return;
+    try { a === 'plan-del' ? await store.deletePlan(el.dataset.id) : await store.deleteDate(el.dataset.id); }
+    catch (err) { toast(errText(err)); return; }
   }
   if (a === 'shop-for') { ui.shopFor = el.dataset.for; ui.shopSel = null; }
   if (a === 'shop-cat') { ui.shopCat = el.dataset.cat; ui.shopSel = null; }

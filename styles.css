@@ -394,3 +394,35 @@ main { animation: fadeUp .25s ease-out; }
 .present-overlay .reveal { display: flex; justify-content: center; animation: pop .45s cubic-bezier(.2,1.4,.4,1); }
 .present-overlay .reveal .bg-swatch { width: 120px; height: 120px; border-radius: 22px; }
 @media (prefers-reduced-motion: reduce) { .present-overlay .box { animation: none; } }
+
+/* ---------- v12: fechas y planes ---------- */
+.count-chip { position: absolute; right: 12px; bottom: 12px; z-index: 4; background: rgba(255,255,255,.92); color: var(--ink); border-radius: 999px; padding: 4px 10px; font-size: 12px; font-weight: 900; text-decoration: none; box-shadow: 0 2px 0 rgba(31,42,58,.1); max-width: 60%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dates { display: grid; gap: 8px; }
+.date-row { display: grid; grid-template-columns: 34px 1fr auto 28px; gap: 8px; align-items: center; padding: 10px; border-radius: 16px; background: var(--soft); }
+.date-row.today { background: #ffe3ec; }
+.date-row.past { opacity: .6; }
+.date-row .de { font-size: 24px; text-align: center; }
+.date-row b { display: block; font-size: 14px; }
+.date-row small { font-size: 12px; color: var(--muted); font-weight: 700; }
+.date-row .left { font-weight: 900; font-size: 13px; color: var(--navy); text-align: right; }
+.x { width: 28px; height: 28px; border: 0; border-radius: 50%; background: transparent; color: var(--muted); font-size: 14px; }
+.add summary { cursor: pointer; font-weight: 800; color: var(--navy); margin-top: 10px; }
+.add-form { display: grid; gap: 8px; margin-top: 10px; }
+.add-form.row { display: flex; }
+.add-form input[type=text], .add-form input:not([type]), .add-form input[type=date] { flex: 1; min-width: 0; min-height: 46px; border: 2px solid var(--line); border-radius: 14px; padding: 0 12px; font-size: 16px; background: #fff; outline: none; }
+.add-form select { min-height: 46px; border: 2px solid var(--line); border-radius: 14px; padding: 0 6px; font-size: 18px; background: #fff; }
+.add-form .btn { margin-top: 0; }
+.add-form .btn.small { min-width: 46px; min-height: 46px; font-size: 22px; padding: 0; }
+.check { display: flex; align-items: center; gap: 6px; font-weight: 700; white-space: nowrap; }
+.check input { width: 20px; height: 20px; }
+.plan { display: grid; grid-template-columns: 32px 28px 1fr 28px; gap: 8px; align-items: center; padding: 10px 0; border-top: 1px solid var(--line); }
+.plan .tick { width: 30px; height: 30px; border-radius: 50%; border: 2px solid var(--line); background: #fff; font-weight: 900; color: #fff; }
+.plan.done .tick { background: var(--ok); border-color: var(--ok); }
+.plan .pe { font-size: 22px; text-align: center; }
+.plan .pt b { display: block; font-size: 14px; }
+.plan.done .pt b { text-decoration: line-through; color: var(--muted); }
+.plan .pt small { font-size: 12px; color: var(--muted); font-weight: 700; }
+.confetti { position: fixed; inset: 0; pointer-events: none; z-index: 40; overflow: hidden; }
+.confetti i { position: absolute; top: -40px; font-size: 26px; font-style: normal; animation: drop 1.6s ease-in forwards; }
+@keyframes drop { to { transform: translateY(110vh) rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .confetti { display: none; } }
