@@ -5,6 +5,7 @@ import { SUPABASE_URL, SUPABASE_KEY } from './config.js';
 import { ACHIEVEMENTS, mondayOf, weekChallenges, CHALLENGE_REWARD, fishForRoll, CASTS_PER_DAY } from './content.js';
 
 // Modo demo: datos de ejemplo en este dispositivo, sin cuenta (?demo o botón "Ver demo").
+if (new URLSearchParams(location.search).has('demo')) sessionStorage.setItem('iglu-demo', '1');
 const DEMO = sessionStorage.getItem('iglu-demo') === '1';
 const CLOUD = !!SUPABASE_KEY && !DEMO;
 const SECTION = { answer: 'answers', mood: 'moods', game: 'games', hug: 'hugs', likely: 'likely', word: 'words', wordplay: 'wordplays', gift: 'gifts', fish: 'fish', draw: 'draws', drawguess: 'drawguesses' };
@@ -34,7 +35,7 @@ export const store = {
   demo: DEMO,
   canCloud: !!SUPABASE_KEY,
   enterDemo() { sessionStorage.setItem('iglu-demo', '1'); location.reload(); },
-  exitDemo() { sessionStorage.removeItem('iglu-demo'); localStorage.removeItem('iglu-demo-v1'); location.hash = ''; location.reload(); },
+  exitDemo() { sessionStorage.removeItem('iglu-demo'); localStorage.removeItem('iglu-demo-v1'); location.href = location.pathname; },
 
   // Devuelve 'ready' | 'signed-out' | 'no-couple'
   async init() {
