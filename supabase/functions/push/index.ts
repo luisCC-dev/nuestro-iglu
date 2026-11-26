@@ -90,6 +90,16 @@ async function onEvent(b: { couple_id: string; kind: string; day: string; slot: 
   return send(subs || [], { title, body, tag });
 }
 
+// Regalo de la tienda: avisar a quien lo recibe (b.slot)
+async function onPresent(b: { couple_id: string; slot: string; item: string }) {
+  const { data: p } = await sb.from("purchases").select("paid_by, note, at")
+    .eq("couple_id", b.couple_id).eq("slot", b.slot).eq("item", b.item).maybeSingle();
+  if (!p || !p.paid_by || p.paid_by === b.slot || Date.now() - Date.parse(p.at) > 120_000) return 0;
+  const { data: m } = await sb.from("members").select("name").eq("couple_id", b.couple_id).eq("slot", p.paid_by).maybeSingle();
+  const { data: subs } = await sb.from("push_subs").select("endpoint, p256dh, auth").eq("couple_id", b.couple_id).eq("slot", b.slot);
+  return send(subs || [], { title: `${m?.name || "Tu pareja"} te ha hecho un regalo 🎁`, body: p.note || "Ábrelo en el iglú.", tag: `present-${b.item}` });
+}
+
 function localParts(tz: string) {
   const f = new Intl.DateTimeFormat("en-CA", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", hour12: false });
   const p = Object.fromEntries(f.formatToParts(new Date()).map((x) => [x.type, x.value]));
@@ -121,6 +131,7 @@ Deno.serve(async (req) => {
     switch (b.mode) {
       case "key": return json({ publicKey });
       case "event": return json({ sent: await onEvent(b) });
+      case "present": return json({ sent: await onPresent(b) });
       case "daily": return json({ sent: await onDaily() });
       case "test": {
         const { data: s } = await sb.from("push_subs").select("endpoint, p256dh, auth").eq("endpoint", String(b.endpoint || "")).maybeSingle();
