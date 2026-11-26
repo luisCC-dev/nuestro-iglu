@@ -331,6 +331,58 @@ function confetti() {
   setTimeout(() => el.remove(), 1800);
 }
 
+// ---------- cápsula del tiempo ----------
+const readyCapsules = () => (ui.data.capsules || []).filter((c) => c.from_slot !== ui.me && !c.locked && !c.opened_at);
+function capsuleBanner() {
+  const c = readyCapsules()[0];
+  if (!c) return '';
+  return `<button class="card capsule-banner" data-action="capsule-open" data-id="${c.id}">
+    <span class="env">💌</span><span><b>Carta de ${name(c.from_slot)} lista para abrir</b><small>«${esc(c.title)}» · toca para abrirla</small></span></button>`;
+}
+function capsuleCard() {
+  const me = ui.me, ot = other(me), list = ui.data.capsules || [];
+  const tomorrow = addDays(today(), 1);
+  const row = (c) => {
+    const mine = c.from_slot === me, left = daysUntil(c.open_on);
+    if (mine) return `<div class="cap mine"><span class="env">✉️</span>
+      <div><b>${esc(c.title)}</b><small>Para ${name(ot)} · ${left > 0 ? `se abre en ${left} ${left === 1 ? 'día' : 'días'}` : c.opened_at ? 'ya la ha leído 💖' : 'ya puede abrirla'}</small></div>
+      <button class="x" data-action="capsule-del" data-id="${c.id}" aria-label="Borrar carta">✕</button></div>`;
+    if (c.locked) return `<div class="cap locked"><span class="env">🔒</span>
+      <div><b>${esc(c.title)}</b><small>De ${name(c.from_slot)} · se abre el ${fmtDate(c.open_on, { day: 'numeric', month: 'long' })} (faltan ${left} ${left === 1 ? 'día' : 'días'})</small></div></div>`;
+    if (!c.opened_at) return `<div class="cap ready"><span class="env">💌</span>
+      <div><b>${esc(c.title)}</b><small>De ${name(c.from_slot)} · ¡ya puedes abrirla!</small></div>
+      <button class="btn small" data-action="capsule-open" data-id="${c.id}">Abrir</button></div>`;
+    return `<details class="cap open"><summary><span class="env">📜</span><div><b>${esc(c.title)}</b><small>De ${name(c.from_slot)} · abierta</small></div></summary><p class="letter">${esc(c.body || '')}</p></details>`;
+  };
+  return `<article class="card">
+    <h2 class="mt0">💌 Cápsula del tiempo</h2>
+    <p class="hint mt0">Escribe una carta que ${name(ot)} no podrá leer hasta el día que elijas.</p>
+    ${list.length ? `<div class="caps">${list.map(row).join('')}</div>` : ''}
+    <details class="add"><summary>+ Escribir una carta</summary>
+      <form data-form="capsule" class="add-form">
+        <input name="title" required maxlength="60" placeholder="Título (ej.: Para nuestro aniversario)" aria-label="Título" autocomplete="off">
+        <textarea name="body" required maxlength="2000" placeholder="Escribe tu carta…" aria-label="Carta"></textarea>
+        <label class="field" style="margin:0"><span style="font-weight:800">Se podrá abrir el</span>
+          <input name="open_on" type="date" required min="${tomorrow}" value="${addDays(today(), 30)}"></label>
+        <button class="btn" type="submit">Guardar en la cápsula</button>
+      </form>
+    </details>
+  </article>`;
+}
+function showCapsule(c) {
+  const el = document.createElement('div');
+  el.className = 'hug-overlay capsule-overlay';
+  el.setAttribute('role', 'dialog');
+  el.setAttribute('aria-label', `Carta de ${name(c.from_slot)}`);
+  el.innerHTML = `<div class="hug-pop">
+    <div class="envelope"><div class="flap"></div><div class="paper-letter"><p class="label">Para ti, de ${name(c.from_slot)}</p><h2>${esc(c.title)}</h2><p class="letter">${esc(c.body || '')}</p>
+      <small class="hint">Escrita el ${fmtDate(c.created_at.slice(0, 10), { day: 'numeric', month: 'long', year: 'numeric' })}</small></div></div>
+    <button class="btn" data-close>Guardar en mi corazón 💖</button></div>`;
+  el.addEventListener('click', (ev) => { if (ev.target.closest('[data-close]') || ev.target === el) el.remove(); });
+  document.body.appendChild(el);
+  requestAnimationFrame(() => setTimeout(() => el.querySelector('.envelope').classList.add('open'), 250));
+}
+
 function iglooCard() {
   const xp = ui.data.xp || 0, L = levelOf(xp);
   const pct = L.next ? Math.round(((xp - L.xp) / (L.next.xp - L.xp)) * 100) : 100;
@@ -428,7 +480,7 @@ function viewToday() {
       ${['a', 'b'].map((w) => `<div class="answer">${penguin(w, null, 34)}<div class="bubble"><b>${name(w)}</b><p>${esc(pa[w].text)}</p></div></div>`).join('')}</details>`);
   }
 
-  return `${codeCard()}${hero()}${giftCard()}
+  return `${codeCard()}${hero()}${capsuleBanner()}${giftCard()}
     <article class="card">
       <div class="label">Pregunta del día</div>
       <p class="question">${esc(questionFor(k))}</p>
@@ -951,6 +1003,7 @@ function viewUs() {
   return `<h1 class="page">Nosotros</h1>
     <p class="lead">Lo activos que estáis y cómo os sentís.</p>
     ${iglooCard()}
+    ${capsuleCard()}
     ${datesCard()}
     ${plansCard()}
     <article class="card">
@@ -1246,6 +1299,12 @@ root.addEventListener('submit', async (e) => {
       await store.giftItem(it.id, it.price, (fd.get('note') || '').trim());
       ui.spending = true; ui.shopSel = null;
       toast(`🎁 ¡${it.name} enviado a ${name(other(ui.me))}!`);
+    } else if (kind === 'capsule') {
+      const title = (fd.get('title') || '').trim(), body = (fd.get('body') || '').trim(), on = fd.get('open_on');
+      if (!title || !body || !on) return;
+      if (on <= today()) { toast('Elige una fecha a partir de mañana.'); if (btn) btn.disabled = false; return; }
+      await store.addCapsule(title, body, on);
+      toast(`💌 Carta guardada. ${name(other(ui.me))} podrá abrirla el ${fmtDate(on, { day: 'numeric', month: 'long' })}`);
     } else if (kind === 'plan') {
       const title = (fd.get('title') || '').trim();
       if (!title) return;
@@ -1359,6 +1418,16 @@ root.addEventListener('click', async (e) => {
     try { await store.save('gift', today(), ui.me, { opened: true }); toast('¡Cofre abierto! 🎉'); }
     catch (err) { toast(errText(err)); }
     ui.opening = false;
+  }
+  if (a === 'capsule-open') {
+    const c = (ui.data.capsules || []).find((x) => x.id === el.dataset.id);
+    if (!c) return;
+    try { await store.openCapsule(c.id); } catch (err) { toast(errText(err)); return; }
+    showCapsule(c);
+  }
+  if (a === 'capsule-del') {
+    if (!confirm('¿Borrar esta carta? No se puede deshacer.')) return;
+    try { await store.deleteCapsule(el.dataset.id); } catch (err) { toast(errText(err)); return; }
   }
   if (a === 'plan-toggle') {
     const done = el.dataset.done === '1';

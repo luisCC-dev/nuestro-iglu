@@ -28,6 +28,7 @@ Abrir http://localhost:8765 (los módulos JS no funcionan abriendo el archivo co
 - Hecho v10: dibuja y adivina (#juego/dibujo, js/draw.js, kinds draw + drawguess, 3 intentos con pista, trazos 0..1000, logro Artista, push redeployada con avisos de dibujos). SQL 010 ya ejecutado.
 - Hecho v11: regalos (Tienda "Para mí / Para pareja", rpc gift_item/open_gift, purchases.paid_by/note/opened, gasto por paid_by con spent_by, paquete sorpresa al abrir, push mode "present" con trigger purchases_notify). SQL 011 ya ejecutado.
 - Hecho v12: fechas especiales (tabla special_dates, anual o única, chip de cuenta atrás en la escena de Hoy) y planes juntos (tabla plans, +20 XP por plan, máx. 2/semana con plans_xp). Enlace demo directo: ?demo. SQL 012 ya ejecutado.
-- Ideas pendientes: cápsula del tiempo, hundir la flota, ¿cuánto me conoces?, tres en raya, hundir la flota, ¿cuánto me conoces?, tres en raya.
+- Hecho v13: cápsula del tiempo (tabla capsules sin lectura directa; rpc list_capsules devuelve el texto solo si ya se puede abrir o es tuya; open_capsule; aviso en Hoy; sobre animado). SQL 013 ya ejecutado.
+- Ideas pendientes: hundir la flota, ¿cuánto me conoces?, tres en raya, hundir la flota, ¿cuánto me conoces?, tres en raya.
 
 Archivos: `index.html`, `styles.css`, `js/app.js` (pantallas), `js/store.js` (datos), `js/config.js`, `js/penguins.js` (dibujos), `js/content.js` (preguntas), `supabase/schema.sql`.

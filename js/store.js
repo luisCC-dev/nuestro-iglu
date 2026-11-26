@@ -14,7 +14,7 @@ let member = null; // { slot, couple_id, name } en modo cloud
 
 // ---------- modo local ----------
 const KEY = DEMO ? 'iglu-demo-v1' : 'iglu-data-v1', ME_KEY = DEMO ? 'iglu-demo-me' : 'iglu-me';
-const empty = () => ({ names: null, answers: {}, moods: {}, games: {}, hugs: {}, likely: {}, words: {}, wordplays: {}, gifts: {}, fish: {}, draws: {}, drawguesses: {}, claims: [], plans: [], dates: [], styles: { a: {}, b: {} }, bg: null, owned: { a: [], b: [] } });
+const empty = () => ({ names: null, answers: {}, moods: {}, games: {}, hugs: {}, likely: {}, words: {}, wordplays: {}, gifts: {}, fish: {}, draws: {}, drawguesses: {}, claims: [], plans: [], dates: [], capsules: [], styles: { a: {}, b: {} }, bg: null, owned: { a: [], b: [] } });
 function loadLocal() { try { return { ...empty(), ...JSON.parse(localStorage.getItem(KEY)) }; } catch { return empty(); } }
 function putLocal(kind, date, who, value) {
   const d = loadLocal(), s = SECTION[kind];
@@ -58,10 +58,12 @@ export const store = {
       d.wallet = coinsEarned(d, this.getMe()) - spentLocal(d, this.getMe());
       d.xp = coupleXp(d);
       d.presents = (d.giftsIn || []).filter((g) => g.to === this.getMe() && !g.opened);
+      const me = this.getMe(), t = dateKey();
+      d.capsules = (d.capsules || []).map((c) => ({ ...c, locked: c.open_on > t, body: c.from_slot === me || c.open_on <= t ? c.body : null }));
       d.week = { monday: mon, metrics: weekMetrics(d, mon), claims: d.claims.filter((c) => c.week === mon).map((c) => c.idx) };
       return d;
     }
-    const [{ data: ms }, { data: es }, { data: c }, { data: ps }, { data: w }, { data: st }, { data: pl }, { data: sd }] = await Promise.all([
+    const [{ data: ms }, { data: es }, { data: c }, { data: ps }, { data: w }, { data: st }, { data: pl }, { data: sd }, { data: cp }] = await Promise.all([
       sb.from('members').select('slot, name, style').eq('couple_id', member.couple_id),
       sb.from('entries').select('kind, day, slot, data, updated_at').eq('couple_id', member.couple_id),
       sb.from('couples').select('code, bg').eq('id', member.couple_id).maybeSingle(),
@@ -70,6 +72,7 @@ export const store = {
       sb.rpc('couple_status', { p_monday: mondayOf(dateKey()) }),
       sb.from('plans').select('*').eq('couple_id', member.couple_id).order('created_at'),
       sb.from('special_dates').select('*').eq('couple_id', member.couple_id),
+      sb.rpc('list_capsules', { p_today: dateKey() }),
     ]);
     const out = empty();
     out.names = { a: null, b: null };
@@ -82,6 +85,7 @@ export const store = {
     out.xp = st?.xp || 0;
     out.plans = pl || [];
     out.dates = sd || [];
+    out.capsules = cp || [];
     out.week = { monday: mondayOf(dateKey()), metrics: st?.week || {}, claims: st?.claims || [] };
     out.full = !!(out.names.a && out.names.b);
     for (const e of es || []) {
@@ -160,6 +164,20 @@ export const store = {
   async deletePlan(id) {
     if (CLOUD) { const { error } = await sb.from('plans').delete().eq('id', id); if (error) throw error; return; }
     const d = loadLocal(); d.plans = d.plans.filter((x) => x.id !== id); localStorage.setItem(KEY, JSON.stringify(d));
+  },
+  async addCapsule(title, body, openOn) {
+    if (CLOUD) { const { error } = await sb.from('capsules').insert({ title, body, open_on: openOn }); if (error) throw error; return; }
+    const d = loadLocal(); (d.capsules ||= []).push({ id: crypto.randomUUID(), from_slot: this.getMe(), title, body, open_on: openOn, opened_at: null, created_at: new Date().toISOString() });
+    localStorage.setItem(KEY, JSON.stringify(d));
+  },
+  async openCapsule(id) {
+    if (CLOUD) { const { error } = await sb.rpc('open_capsule', { p_id: id, p_today: dateKey() }); if (error) throw error; return; }
+    const d = loadLocal(), c = (d.capsules || []).find((x) => x.id === id); if (c) c.opened_at = new Date().toISOString();
+    localStorage.setItem(KEY, JSON.stringify(d));
+  },
+  async deleteCapsule(id) {
+    if (CLOUD) { const { error } = await sb.from('capsules').delete().eq('id', id); if (error) throw error; return; }
+    const d = loadLocal(); d.capsules = (d.capsules || []).filter((x) => x.id !== id); localStorage.setItem(KEY, JSON.stringify(d));
   },
   async addDate(title, emoji, day, yearly) {
     if (CLOUD) { const { error } = await sb.from('special_dates').insert({ title, emoji, day, yearly }); if (error) throw error; return; }
@@ -319,6 +337,10 @@ function seedDemo() {
     { id: 'p1', title: 'Ver un amanecer en la playa', emoji: '🌄', created_by: 'b', created_at: iso(addDays(t, -9)), done_at: null, done_by: null },
     { id: 'p2', title: 'Cocinar sushi juntos', emoji: '🍣', created_by: 'a', created_at: iso(addDays(t, -6)), done_at: null, done_by: null },
     { id: 'p3', title: 'Maratón de pelis de Navidad', emoji: '🎬', created_by: 'b', created_at: iso(addDays(t, -8)), done_at: iso(addDays(t, -2)), done_by: 'a' },
+  ];
+  d.capsules = [
+    { id: 'c1', from_slot: 'b', title: 'Para cuando lo necesites', body: 'Si estás leyendo esto, quiero que sepas que estoy muy orgullosa de ti. Gracias por cada día. 🐧💖', open_on: t, opened_at: null, created_at: iso(addDays(t, -20)) },
+    { id: 'c2', from_slot: 'b', title: 'Para nuestro aniversario', body: 'secreto', open_on: addDays(t, 12), opened_at: null, created_at: iso(addDays(t, -3)) },
   ];
   d.dates = [
     { id: 'd1', title: 'Nuestro aniversario', emoji: '💖', day: addDays(t, 12).replace(/^\d{4}/, '2023'), yearly: true, created_by: 'a' },
