@@ -2,6 +2,7 @@ import { store, dateKey, addDays, dayNumber, achievementMetrics, fishAt, catches
 import { penguin, MOODS, moodById, setStyles } from './penguins.js';
 import { scene, bgSwatch } from './scene.js';
 import { drawAll, replay, mountPad, pointCount } from './draw.js';
+import * as fx from './anim.js';
 import { QUESTIONS, THIS_OR_THAT, ROUND_SIZE, HUGS, LIKELY, LIKELY_SIZE, SHOP, SHOP_CATS, itemById, EARN, ACHIEVEMENTS, levelOf, weekChallenges, CHALLENGE_REWARD, LEVELS, FISH, CASTS_PER_DAY, DRAW_WORDS, DRAW_TRIES, DRAW_COLORS } from './content.js';
 
 const root = document.getElementById('app');
@@ -48,6 +49,7 @@ function toast(msg) {
   const t = document.getElementById('toast');
   t.textContent = msg;
   t.classList.add('show');
+  t.classList.remove('bump'); void t.offsetWidth; t.classList.add('bump'); // rebote al entrar
   clearTimeout(toast.t);
   toast.t = setTimeout(() => t.classList.remove('show'), 2200);
 }
@@ -72,6 +74,9 @@ function gameScore(g, who) {
   if (!mine || !theirs) return null;
   return mine.guesses.filter((x, i) => x === theirs.picks[i]).length;
 }
+
+// Pingüino de "yo" dentro de una escena de portada/diario (orden a,b)
+const mePenguin = () => fx.$$('.duo .penguin')[ui.me === 'a' ? 0 : 1];
 
 // ---------- piezas comunes ----------
 function header() {
@@ -245,6 +250,7 @@ function showHug(from, h) {
     if (c || ev.target === el) el.remove();
   });
   document.body.appendChild(el);
+  setTimeout(() => { const sc = el.querySelector('.scene'); if (sc) { const c = fx.center(sc); fx.burst(c.x, c.y - 10, { emojis: [e, '💗', '✨'], n: 12, r: 100, size: 22 }); } }, 380);
 }
 
 function giftCard() {
@@ -381,6 +387,7 @@ function showCapsule(c) {
   el.addEventListener('click', (ev) => { if (ev.target.closest('[data-close]') || ev.target === el) el.remove(); });
   document.body.appendChild(el);
   requestAnimationFrame(() => setTimeout(() => el.querySelector('.envelope').classList.add('open'), 250));
+  setTimeout(() => { const env = el.querySelector('.envelope'); if (env) { const c = fx.center(env); fx.burst(c.x, c.y, { emojis: ['💖', '✨', '💌'], n: 10, r: 110, size: 20 }); } }, 750);
 }
 
 function iglooCard() {
@@ -416,7 +423,13 @@ function checkLevel() {
   const key = `iglu-lvl-${store.demo ? 'demo' : 'cloud'}`;
   const lv = levelOf(ui.data.xp || 0).level, before = Number(localStorage.getItem(key) || 0);
   localStorage.setItem(key, String(lv));
-  if (before && lv > before) setTimeout(() => toast(`⭐ ¡Vuestro iglú sube a nivel ${lv}! Nueva mejora: ${LEVELS[lv - 1].unlock}`), 1600);
+  if (before && lv > before) setTimeout(() => {
+    toast(`⭐ ¡Vuestro iglú sube a nivel ${lv}! Nueva mejora: ${LEVELS[lv - 1].unlock}`);
+    const t = document.querySelector('.hero .igloo') || document.querySelector('.hero');
+    const c = t ? fx.center(t) : { x: innerWidth / 2, y: innerHeight / 3 };
+    fx.burst(c.x, c.y, { emojis: ['⭐', '✨', '🌟'], n: 16, r: 120, size: 24, dur: 1200 });
+    if (t) fx.pulse(t, 1.1, 500);
+  }, 1600);
 }
 
 function achievementsCard() {
@@ -445,7 +458,10 @@ function checkAchievements() {
   if (before == null) return;
   const prev = JSON.parse(before);
   const fresh = ACHIEVEMENTS.filter((a) => now.includes(a.id) && !prev.includes(a.id));
-  if (fresh.length) setTimeout(() => toast(`🏆 ${fresh.length > 1 ? "Logros" : "Logro"}: ${fresh.map((a) => a.name).join(" y ")} (+${fresh.reduce((n, a) => n + a.reward, 0)} 🪙)`), 900);
+  if (fresh.length) setTimeout(() => {
+    toast(`🏆 ${fresh.length > 1 ? "Logros" : "Logro"}: ${fresh.map((a) => a.name).join(" y ")} (+${fresh.reduce((n, a) => n + a.reward, 0)} 🪙)`);
+    fx.burst(innerWidth / 2, 34, { emojis: ['🏆', '✨', '🪙'], n: 10, r: 90, size: 20, lift: 0 });
+  }, 900);
 }
 
 function viewToday() {
@@ -555,7 +571,7 @@ function calendar() {
   let detail = '';
   if (ui.calSel) {
     const m = ui.data.moods[ui.calSel] || {};
-    detail = `<div style="margin-top:14px"><div class="label">${fmtDate(ui.calSel)}</div><div class="today-moods">${['a', 'b'].map((w) => {
+    detail = `<div class="cal-detail" style="margin-top:14px"><div class="label">${fmtDate(ui.calSel)}</div><div class="today-moods">${['a', 'b'].map((w) => {
       const md = m[w] && moodById(m[w].mood);
       return `<div class="mood-box" style="${md ? `background:${md.color}` : ''}">${penguin(w, md?.id, 48).replace('class="penguin', 'style="margin:0 auto" class="penguin')}
         <b>${name(w)}</b><small>${md ? md.label : 'Sin apuntar'}</small>${m[w]?.note ? `<p>${esc(m[w].note)}</p>` : ''}</div>`;
@@ -820,8 +836,18 @@ function fishStatus() {
   return left > 0 ? ['todo', `Te quedan ${left} cañas`] : ['ok', 'Vuelve mañana'];
 }
 
+// Efecto de cada fase de la pesca: se aplica durante ~1,5 s aunque la pantalla se repinte,
+// continuando la animación donde iba (--el negativo = tiempo ya transcurrido).
+function fishFx() {
+  const st = ui.fishing;
+  if (!st || st.phase === 'idle') return { cls: '', style: '' };
+  const t = ((st.fxT ??= {})[st.phase] ??= Date.now()), el = Date.now() - t;
+  if (el > 1500) return { cls: '', style: '' };
+  return { cls: `fx-${st.phase}${st.phase === 'result' ? (st.ok ? ' catch' : ' miss') : ''}`, style: `--el:-${el}ms` };
+}
 function rodScene(extra = '') {
-  return `<div class="pond-scene">
+  const f = fishFx();
+  return `<div class="pond-scene ${f.cls}" style="${f.style}">
     <div class="fisher">${penguin(ui.me, ui.fishing?.phase === 'result' && ui.fishing.ok ? 'feliz' : ui.fishing?.phase === 'result' ? 'triste' : 'emocionado', 78)}
       <svg class="rod" viewBox="0 0 100 80" aria-hidden="true"><path d="M8 70 Q50 10 92 6" stroke="#8a5a36" stroke-width="3.5" fill="none" stroke-linecap="round"/>
       <path class="line" d="M92 6 V95" stroke="#1f2a3a" stroke-width="1" opacity=".6"/></svg></div>
@@ -837,7 +863,7 @@ function gameFish() {
     play = `${rodScene()}<p class="question center" style="margin:12px 0 0">Esperando a que pique…</p>`;
   } else if (st.phase === 'reel') {
     const f = st.fish;
-    play = `${rodScene('<span class="splash-ring"></span>')}
+    play = `${rodScene('<span class="splash-ring"></span><span class="bang" aria-hidden="true">!</span>')}
       <p class="center fish-hint">¡Ha picado algo! ${f.zone <= 0.14 ? '¡Parece grande!' : ''}</p>
       <div class="meter" aria-hidden="true"><span class="zone" style="left:${(st.zoneStart * 100).toFixed(1)}%;width:${(f.zone * 100).toFixed(1)}%"></span><span class="marker" id="fish-marker"></span></div>
       <button class="btn big-btn" data-action="fish-pull">¡Tirar!</button>`;
@@ -1135,6 +1161,7 @@ function checkPresents() {
         ${pr.note ? `<p class="hug-msg">“${esc(pr.note)}”</p>` : `<p class="hint mt0">Un regalo de ${name(pr.from)}</p>`}
         <button class="btn" data-wear>${cat === 'bg' ? 'Poner este fondo' : '¡Ponérmelo!'}</button>
         <button class="btn secondary" data-later>Guardar</button>`;
+      const rv = el.querySelector('.reveal'); if (rv) { const c = fx.center(rv); fx.burst(c.x, c.y, { emojis: ['✨', '🎉', '💖', '⭐'], n: 14, r: 110, size: 22 }); }
       return;
     }
     if (ev.target.closest('[data-wear]')) {
@@ -1152,6 +1179,8 @@ function coinPop(n) {
   el.textContent = `+${n} 🪙`;
   document.body.appendChild(el);
   setTimeout(() => el.remove(), 1600);
+  const from = fx.takeCoinOrigin() || { x: innerWidth / 2, y: 92 };
+  fx.after(() => fx.flyCoins(from, n)); // las monedas vuelan al contador de la cabecera
 }
 
 // ---------- avisos push ----------
@@ -1238,6 +1267,7 @@ async function render() {
   ui.data = await store.getAll();
   setStyles(ui.data.styles);
   if (ui.lastWallet != null && ui.data.wallet > ui.lastWallet && !ui.spending) coinPop(ui.data.wallet - ui.lastWallet);
+  else if (ui.lastWallet != null && ui.data.wallet < ui.lastWallet) fx.after(() => fx.pulse(fx.$('.chip.coins'), 1.2, 320));
   ui.lastWallet = ui.data.wallet; ui.spending = false;
   checkAchievements();
   checkLevel();
@@ -1247,12 +1277,16 @@ async function render() {
   ui.sub = sub;
   const views = { hoy: viewToday, diario: viewDiary, juego: viewGame, tienda: viewShop, nosotros: viewUs };
   const fn = views[view] || viewToday;
-  root.innerHTML = header() + `<main>${fn()}</main>` + tabs(views[view] ? view : 'hoy');
+  const viewKey = `${view}/${sub || ''}`, entering = ui.viewKey !== viewKey;
+  ui.viewKey = viewKey;
+  root.innerHTML = header() + `<main${entering ? ' class="enter"' : ''}>${fn()}</main>` + tabs(views[view] ? view : 'hoy');
+  if (entering) fx.after(fx.bounceTab);
   if (!document.querySelector('.hug-overlay')) checkNewHug();
   checkPresents();
   if (view === 'nosotros' && store.cloud) fillPush();
   if (view === 'juego' && ui.sub === 'pesca') startReel();
   if (view === 'juego' && ui.sub === 'dibujo') afterDrawRender();
+  fx.flush();
 }
 
 // ---------- eventos ----------
@@ -1260,6 +1294,7 @@ root.addEventListener('submit', async (e) => {
   e.preventDefault();
   const f = e.target, kind = f.dataset.form, fd = new FormData(f);
   const btn = f.querySelector('button[type=submit]');
+  const btnPt = btn ? fx.center(btn) : null; // para efectos que salen del botón
   if (btn) btn.disabled = true;
   try {
     if (kind === 'setup') {
@@ -1292,28 +1327,50 @@ root.addEventListener('submit', async (e) => {
       const ok = sameWord(g, pd.word);
       const result = ok ? 'win' : tries.length >= DRAW_TRIES ? 'lose' : null;
       await store.save('drawguess', pd.day, ui.me, { tries, result });
+      fx.after(() => {
+        if (ok) {
+          confetti();
+          fx.$$('.word.small .lt.on').forEach((t, i) => fx.flip(t, i * 50));
+          fx.pop(fx.$('.question.center'), 500, 250);
+        } else {
+          fx.shake(fx.$('.guess-form') || fx.$('#guess-canvas'));
+          fx.flip(fx.$$('.word.small .lt.on').at(-1), 100);
+          if (result) fx.shake(fx.$('#guess-canvas'), 9);
+        }
+      });
       toast(ok ? '¡Acertaste! 🎉' : result ? 'Se acabaron los intentos' : '¡No! Te damos una letra de pista');
     } else if (kind === 'gift-item') {
       const it = itemById(ui.shopSel);
       if (!it) return;
       await store.giftItem(it.id, it.price, (fd.get('note') || '').trim());
       ui.spending = true; ui.shopSel = null;
+      fx.after(() => { // el regalo vuela hasta el pingüino de tu pareja
+        const target = fx.$$('.stage .duo .penguin')[1];
+        if (target && btnPt) fx.fly(btnPt, fx.center(target), '🎁', 1, { size: 34, dur: 900, arc: -110, done: () => { fx.sparkle(target); fx.hop(target); } });
+        fx.pulse(fx.$('.stage .wallet'), 1.25);
+      });
       toast(`🎁 ¡${it.name} enviado a ${name(other(ui.me))}!`);
     } else if (kind === 'capsule') {
       const title = (fd.get('title') || '').trim(), body = (fd.get('body') || '').trim(), on = fd.get('open_on');
       if (!title || !body || !on) return;
       if (on <= today()) { toast('Elige una fecha a partir de mañana.'); if (btn) btn.disabled = false; return; }
+      const before = fx.snapIds('.cap [data-action]');
       await store.addCapsule(title, body, on);
+      fx.slideNewRows('.cap [data-action]', '.cap', before);
       toast(`💌 Carta guardada. ${name(other(ui.me))} podrá abrirla el ${fmtDate(on, { day: 'numeric', month: 'long' })}`);
     } else if (kind === 'plan') {
       const title = (fd.get('title') || '').trim();
       if (!title) return;
+      const before = fx.snapIds('.plan [data-action=plan-toggle]');
       await store.addPlan(title, fd.get('emoji') || '✨');
+      fx.slideNewRows('.plan [data-action=plan-toggle]', '.plan', before);
       toast('Plan apuntado 📝');
     } else if (kind === 'date') {
       const title = (fd.get('title') || '').trim(), day = fd.get('day');
       if (!title || !day) return;
+      const before = fx.snapIds('.date-row .x');
       await store.addDate(title, fd.get('emoji') || '💖', day, fd.get('yearly') === 'on');
+      fx.slideNewRows('.date-row .x', '.date-row', before);
       toast('Fecha guardada 📅');
     } else if (kind === 'hug') {
       const k = today(), list = [...(ui.data.hugs?.[k]?.[ui.me]?.items || [])];
@@ -1321,17 +1378,24 @@ root.addEventListener('submit', async (e) => {
       list.push({ type, msg: fd.get('msg').trim(), at: Date.now() });
       await store.saveHugs(k, ui.me, list.slice(-30));
       ui.hugPick = null;
+      if (btnPt) fx.floatUp(btnPt, hugById(type)[1], 5); // el mimo sale volando del botón
       toast(`${hugById(type)[1]} Enviado a ${name(other(ui.me))}`);
     } else if (kind === 'answer') {
       const text = fd.get('text').trim();
       if (!text) return;
       await store.saveAnswer(today(), ui.me, text);
+      fx.after(() => { // una sola burbuja → aparece; las dos → entran cada una desde su lado
+        const list = fx.$$('.card:not(.history) > .answer');
+        if (list.length >= 2) list.forEach((a, i) => fx.slideIn(a, { x: i ? 60 : -60, y: 0, dur: 520, delay: i * 120 }));
+        else list.forEach((a) => fx.pop(a, 480));
+      });
       toast('Respuesta guardada 🐧');
     } else if (kind === 'mood') {
       const mood = ui.draftMood ?? ui.data.moods[today()]?.[ui.me]?.mood;
       if (!mood) return;
       await store.saveMood(today(), ui.me, mood, fd.get('note').trim());
       ui.editMood = false; ui.draftMood = null;
+      fx.after(() => { fx.hop(mePenguin()); fx.sparkle(mePenguin(), { n: 6 }); fx.$$('.card > .mood-box').forEach((b) => fx.pop(b, 480)); });
       toast('Día guardado');
     }
   } catch (err) {
@@ -1341,6 +1405,21 @@ root.addEventListener('submit', async (e) => {
   }
   render();
 });
+
+// Feedback al elegir en los juegos: la tarjeta elegida "late" y las demás se atenúan; luego pasa la siguiente.
+async function tapChoice(el) {
+  const wrap = el.closest('.choices');
+  if (!wrap || fx.reduced()) return;
+  ui.picking = true;
+  wrap.classList.add('picked'); el.classList.add('chosen');
+  await fx.wait(260);
+  ui.picking = false;
+  fx.after(() => {
+    const c = fx.$('.choices');
+    if (c) { fx.slideIn(c, { x: 40, y: 0, dur: 360 }); fx.slideIn(fx.$('.question'), { x: 24, y: 0, dur: 320 }); }
+    else { fx.$$('.result-row, .lk-row').forEach((r, i) => fx.slideIn(r, { y: 14, delay: i * 50, dur: 340 })); fx.pop(fx.$('.score, .duo-inline'), 520); }
+  });
+}
 
 root.addEventListener('click', async (e) => {
   const el = e.target.closest('[data-action]');
@@ -1366,7 +1445,7 @@ root.addEventListener('click', async (e) => {
     } catch (err) { toast(errText(err)); fillPush(); }
     return;
   }
-  if (a === 'draw-pick') { ui.pad = { word: el.dataset.word, strokes: [], color: DRAW_COLORS[0], size: SIZES[1][0] }; }
+  if (a === 'draw-pick') { fx.after(() => fx.pop(fx.$('#pad-canvas'), 420)); ui.pad = { word: el.dataset.word, strokes: [], color: DRAW_COLORS[0], size: SIZES[1][0] }; }
   if (a === 'draw-color' && ui.pad) { ui.pad.color = el.dataset.c; if (el.dataset.c === '#ffffff') ui.pad.size = SIZES[2][0]; }
   if (a === 'draw-size' && ui.pad) ui.pad.size = Number(el.dataset.s);
   if (a === 'draw-undo' && ui.pad) ui.pad.strokes.pop();
@@ -1379,6 +1458,7 @@ root.addEventListener('click', async (e) => {
       await store.save('draw', today(), ui.me, { word: ui.pad.word, strokes: ui.pad.strokes });
       toast(`Dibujo enviado a ${name(other(ui.me))} ✏️`);
       ui.pad = null; ui.drawOpts = null;
+      fx.after(() => fx.pop(fx.$('#mine-canvas'), 520));
     } catch (err) { toast(errText(err)); el.disabled = false; return; }
   }
   if (a === 'fish-cast') {
@@ -1402,19 +1482,30 @@ root.addEventListener('click', async (e) => {
     const pos = st.pos ?? 0;
     st.ok = pos >= st.zoneStart && pos <= st.zoneStart + st.fish.zone;
     st.phase = 'result';
+    const pondEl = document.querySelector('.pond'), pc = pondEl ? fx.center(pondEl) : null;
+    if (pc && st.ok) { fx.setCoinOrigin({ x: pc.x, y: pc.y - 30 }); fx.burst(pc.x, pc.y, { emojis: ['💦', '✨', '💧'], n: 12, r: 70, size: 18 }); }
     try { await store.save('fish', today(), ui.me, { casts: [...myCasts(), st.ok ? 1 : 0] }); }
     catch (err) { toast(errText(err)); }
   }
   if (a === 'claim') {
     el.disabled = true;
-    try { await store.claimChallenge(ui.data.week.monday, Number(el.dataset.idx)); toast(`🎯 ¡Reto cumplido! +${CHALLENGE_REWARD} 🪙 para cada uno`); }
-    catch (err) { toast(errText(err)); el.disabled = false; return; }
+    const row = el.closest('.ch'), pos = fx.$$('.igloo-card .ch').indexOf(row), c = fx.center(el);
+    try {
+      await store.claimChallenge(ui.data.week.monday, Number(el.dataset.idx));
+      toast(`🎯 ¡Reto cumplido! +${CHALLENGE_REWARD} 🪙 para cada uno`);
+      fx.setCoinOrigin(c);
+      fx.burst(c.x, c.y, { emojis: ['🪙', '✨', '⭐'], n: 12, r: 80, size: 20 });
+      fx.after(() => { const r = fx.$$('.igloo-card .ch')[pos]; fx.pop(fx.$('.ch-ok', r), 520); fx.pulse(r, 1.04, 420); });
+    } catch (err) { toast(errText(err)); el.disabled = false; return; }
   }
   if (a === 'gift') {
     if (ui.opening) return;
     ui.opening = true;
     el.classList.add('opening');
+    const chestPt = fx.center(el);
     await new Promise((r) => setTimeout(r, 750));
+    fx.setCoinOrigin(chestPt);
+    fx.burst(chestPt.x, chestPt.y, { emojis: ['🪙', '✨', '🪙', '🎉'], n: 16, r: 100, size: 22, dur: 1100 });
     try { await store.save('gift', today(), ui.me, { opened: true }); toast('¡Cofre abierto! 🎉'); }
     catch (err) { toast(errText(err)); }
     ui.opening = false;
@@ -1424,24 +1515,45 @@ root.addEventListener('click', async (e) => {
     if (!c) return;
     try { await store.openCapsule(c.id); } catch (err) { toast(errText(err)); return; }
     showCapsule(c);
+    fx.after(() => fx.pop(fx.$('.cap.open'), 400));
   }
   if (a === 'capsule-del') {
     if (!confirm('¿Borrar esta carta? No se puede deshacer.')) return;
+    await fx.slideOut(el.closest('.cap'));
     try { await store.deleteCapsule(el.dataset.id); } catch (err) { toast(errText(err)); return; }
   }
   if (a === 'plan-toggle') {
     const done = el.dataset.done === '1';
-    try { await store.setPlanDone(el.dataset.id, done); if (done) { confetti(); toast('¡Plan cumplido! 🎉'); } }
+    const pid = el.dataset.id;
+    try {
+      await store.setPlanDone(pid, done);
+      fx.after(() => { const t = fx.$(`.plan [data-action=plan-toggle][data-id="${pid}"]`); fx.pop(t, 450); fx.pop(fx.$('.pe', t?.closest('.plan')), 520, 80); });
+      if (done) { confetti(); toast('¡Plan cumplido! 🎉'); }
+    }
     catch (err) { toast(errText(err)); return; }
   }
   if (a === 'plan-del' || a === 'date-del') {
     if (!confirm('¿Borrarlo? Se borra para los dos.')) return;
+    await fx.slideOut(el.closest('.plan, .date-row'));
     try { a === 'plan-del' ? await store.deletePlan(el.dataset.id) : await store.deleteDate(el.dataset.id); }
     catch (err) { toast(errText(err)); return; }
   }
-  if (a === 'shop-for') { ui.shopFor = el.dataset.for; ui.shopSel = null; }
-  if (a === 'shop-cat') { ui.shopCat = el.dataset.cat; ui.shopSel = null; }
-  if (a === 'shop-sel') ui.shopSel = ui.shopSel === el.dataset.item ? null : el.dataset.item;
+  if (a === 'shop-for') {
+    ui.shopFor = el.dataset.for; ui.shopSel = null;
+    fx.after(() => { fx.pop(fx.$('.for-toggle .cat.on'), 380); fx.$$('.stage .duo .penguin').forEach((p, i) => fx.slideIn(p, { x: i ? 26 : -26, y: 0, dur: 420 })); });
+  }
+  if (a === 'shop-cat') {
+    ui.shopCat = el.dataset.cat; ui.shopSel = null;
+    fx.after(() => { fx.pop(fx.$('.cats .cat.on'), 360); fx.$$('.items .item').forEach((it, i) => fx.slideIn(it, { y: 16, delay: Math.min(i, 12) * 30, dur: 340 })); });
+  }
+  if (a === 'shop-sel') {
+    ui.shopSel = ui.shopSel === el.dataset.item ? null : el.dataset.item;
+    const gift = ui.shopFor === 'ot';
+    fx.after(() => {
+      const it = fx.$('.item.sel');
+      if (it) { fx.ring(it); fx.wobble(fx.$$('.stage .duo .penguin')[gift ? 1 : 0]); }
+    });
+  }
   if (a === 'shop-buy' || a === 'shop-equip') {
     el.disabled = true;
     const id = el.dataset.item, cat = ui.shopCat || 'hat';
@@ -1456,11 +1568,19 @@ root.addEventListener('click', async (e) => {
         toast(id ? '¡Puesto!' : 'Quitado');
       }
       ui.spending = true;
+      const mine = () => fx.$$('.stage .duo .penguin')[0];
+      fx.after(() => {
+        if (a === 'shop-buy') { fx.sparkle(mine(), { n: 12, r: 70 }); fx.pulse(fx.$('.stage .wallet'), 1.25); }
+        fx.hop(mine());
+      });
     } catch (err) { toast(errText(err)); el.disabled = false; return; }
   }
   if (a === 'demo') { store.enterDemo(); return; }
   if (a === 'exit-demo') { store.exitDemo(); return; }
-  if (a === 'hug-pick') ui.hugPick = ui.hugPick === el.dataset.hug ? null : el.dataset.hug;
+  if (a === 'hug-pick') {
+    ui.hugPick = ui.hugPick === el.dataset.hug ? null : el.dataset.hug;
+    fx.after(() => { const on = fx.$('.hug.on'); if (on) { fx.squish(on); fx.wobble(fx.$('.emoji', on)); fx.slideIn(fx.$('.hug-form'), { y: -10, dur: 320 }); } });
+  }
   if (a === 'delete-iglu') {
     if (!confirm('¿Eliminar vuestro iglú? Se borrará TODO: respuestas, diario, partidas y mimos de los dos.')) return;
     if (!confirm('Última confirmación: esto no se puede deshacer. ¿Eliminar?')) return;
@@ -1471,20 +1591,27 @@ root.addEventListener('click', async (e) => {
   if (a === 'signout') { await store.signOut(); ui.status = null; location.hash = ''; }
   if (a === 'pick-mood') {
     ui.draftMood = el.dataset.mood;
+    fx.after(() => { fx.squish(fx.$('.mood[aria-pressed="true"]')); fx.hop(mePenguin()); });
     const note = root.querySelector('textarea[name="note"]')?.value;
     await render();
     if (note != null) root.querySelector('textarea[name="note"]').value = note;
     return;
   }
-  if (a === 'edit-mood') { ui.editMood = true; ui.draftMood = null; }
-  if (a === 'cal-day') ui.calSel = ui.calSel === el.dataset.day ? null : el.dataset.day;
+  if (a === 'edit-mood') { ui.editMood = true; ui.draftMood = null; fx.after(() => fx.$$('.mood').forEach((m, i) => fx.pop(m, 380, i * 30))); }
+  if (a === 'cal-day') {
+    ui.calSel = ui.calSel === el.dataset.day ? null : el.dataset.day;
+    fx.after(() => { fx.pop(fx.$('.day.sel'), 320); fx.slideIn(fx.$('.cal-detail'), { y: 10, dur: 340 }); });
+  }
   if (a === 'cal-prev' || a === 'cal-next') {
     const cur = ui.calMonth || today().slice(0, 7);
     const [y, m] = cur.split('-').map(Number);
     const dt = new Date(y, m - 1 + (a === 'cal-next' ? 1 : -1), 1);
     ui.calMonth = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}`;
+    fx.after(() => fx.slideIn(fx.$('.cal'), { x: a === 'cal-next' ? 36 : -36, y: 0, dur: 320 }));
   }
   if (a === 'lk-pick') {
+    if (ui.picking) return;
+    await tapChoice(el);
     const k = today(), st = ui.lk;
     st.picks[st.step] = el.dataset.who; st.step++;
     if (st.step >= LIKELY_SIZE) {
@@ -1495,14 +1622,29 @@ root.addEventListener('click', async (e) => {
   if (a === 'letter') {
     const pw = partnerWord();
     if (!pw || pw.play?.result) return;
-    const guessed = (pw.play?.guessed || '') + el.dataset.l;
+    const L = el.dataset.l, prevWrong = wordState(pw.word, pw.play?.guessed || '').wrong;
+    const guessed = (pw.play?.guessed || '') + L;
     const st = wordState(pw.word, guessed);
     const result = st.solved ? 'win' : st.lost ? 'lose' : null;
     try { await store.save('wordplay', pw.day, ui.me, { guessed, result }); }
     catch (err) { toast(errText(err)); return; }
-    if (result === 'win') toast('¡Adivinada! 🎉');
+    fx.after(() => {
+      fx.pop(fx.$(`.key[data-l="${L}"]`), 320);
+      if (pw.word.includes(L)) {
+        fx.$$('.melt ~ .word .lt.on').filter((t) => t.textContent === L).forEach((t, i) => fx.flip(t, i * 70));
+        if (result === 'win') fx.sparkle(fx.$('.melt .pg'), { n: 12, r: 80 });
+      } else {
+        fx.shake(fx.$('.melt'), 6); fx.shake(fx.$('.melt .pg'), 8); fx.pulse(fx.$('.melt .lives'), 1.2);
+        const w0 = Math.max(46, 220 - prevWrong * 30), w1 = Math.max(46, 220 - st.wrong * 30), ice = fx.$('.melt .floe2');
+        if (ice && w0 !== w1) ice.animate([{ transform: `scaleX(${w0 / w1})` }, { transform: 'scaleX(1)' }], { duration: 500, easing: 'ease-out' });
+        if (result === 'lose') fx.$('.melt .pg')?.animate([{ transform: 'translateY(-58px)' }, { transform: 'translateY(0)' }], { duration: 750, easing: 'ease-in' });
+      }
+    });
+    if (result === 'win') { confetti(); toast('¡Adivinada! 🎉'); }
   }
   if (a === 'choose') {
+    if (ui.picking) return;
+    await tapChoice(el);
     const s = ui.game, i = Number(el.dataset.i);
     if (s.phase === 'pick') { s.picks[s.step] = i; s.phase = 'guess'; }
     else {

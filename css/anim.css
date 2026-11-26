@@ -1,0 +1,121 @@
+/* Animaciones de Nuestro Iglú. Los efectos dinámicos están en js/anim.js (Web Animations);
+   aquí van las entradas por CSS y los estados de la UI. Solo transform/opacity cuando es posible. */
+
+/* ---- Capa de partículas (monedas, destellos, corazones) ---- */
+#fx-layer { position: fixed; inset: 0; z-index: 50; pointer-events: none; overflow: hidden; }
+.fx-p { position: absolute; margin: -.5em 0 0 -.5em; line-height: 1; font-style: normal; will-change: transform, opacity; }
+
+/* ---- Entrada de pantalla: solo al cambiar de pestaña/juego (no en cada repintado) ---- */
+main { animation: none; }
+main.enter > * { animation: cardIn .42s cubic-bezier(.2, .9, .3, 1) backwards; }
+main.enter > :nth-child(2) { animation-delay: .04s; }
+main.enter > :nth-child(3) { animation-delay: .08s; }
+main.enter > :nth-child(4) { animation-delay: .12s; }
+main.enter > :nth-child(5) { animation-delay: .16s; }
+main.enter > :nth-child(6) { animation-delay: .20s; }
+main.enter > :nth-child(7) { animation-delay: .24s; }
+main.enter > :nth-child(8) { animation-delay: .28s; }
+main.enter > :nth-child(n+9) { animation-delay: .32s; }
+@keyframes cardIn { from { opacity: 0; transform: translateY(14px) scale(.98); } }
+
+/* ---- Pulsaciones coherentes en toda la app ---- */
+.chip, .tab, .cat, .icon-btn, .item, .hug, .mood, .choice, .key, .game-card, .sw { transition: transform .12s ease, background-color .15s; }
+.chip:active, .cat:active, .icon-btn:active, .tab:active { transform: scale(.93); }
+.tab:active { transform: scale(.9); }
+.tab[aria-current="page"] { transition: background-color .25s; }
+.x:active { transform: scale(.8); }
+.x { transition: transform .12s; }
+
+/* ---- Toast más saltarín ---- */
+.toast { transition: translate .22s ease-in; }
+.toast.show { transition: translate .55s cubic-bezier(.34, 1.7, .5, 1); }
+.toast.bump { animation: toastBump .5s cubic-bezier(.3, 1.6, .5, 1); }
+@keyframes toastBump { 0% { scale: .85 .85; } 55% { scale: 1.06 1.06; } 100% { scale: 1 1; } }
+
+/* ---- Mimo recibido: escalonado y brillo ---- */
+.hug-pop > h2, .hug-pop > .hug-msg, .hug-pop > .btn { animation: cardIn .45s cubic-bezier(.2, .9, .3, 1) backwards; }
+.hug-pop > h2 { animation-delay: .25s; }
+.hug-pop > .hug-msg { animation-delay: .35s; }
+.hug-pop > .btn { animation-delay: .45s; }
+.hug-pop > .btn + .btn { animation-delay: .52s; }
+.hug-pop .scene { animation: sceneIn .6s cubic-bezier(.2, 1.3, .4, 1) backwards; }
+@keyframes sceneIn { from { opacity: 0; transform: translateY(24px) scale(.8); } }
+.hug-overlay { animation: fade .25s ease-out; }
+
+/* ---- Regalo (paquete sorpresa) ---- */
+.present-overlay .reveal { position: relative; }
+.present-overlay .reveal::before { content: ""; position: absolute; left: 50%; top: 50%; width: 170px; height: 170px; margin: -85px 0 0 -85px; border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 224, 140, .85) 0%, rgba(255, 224, 140, 0) 70%); z-index: -1; animation: glowIn 1s ease-out both; }
+@keyframes glowIn { from { transform: scale(.3); opacity: 0; } 40% { opacity: 1; } to { transform: scale(1.5); opacity: 0; } }
+.present-overlay .hug-pop > h2, .present-overlay .hug-pop > .hug-msg { animation: cardIn .45s .15s cubic-bezier(.2, .9, .3, 1) backwards; }
+
+/* ---- Cápsula del tiempo ---- */
+.capsule-overlay .envelope { animation: envIn .7s cubic-bezier(.2, 1.25, .4, 1) backwards; }
+@keyframes envIn { from { opacity: 0; transform: translateY(-40px) rotate(-6deg) scale(.8); } 60% { transform: translateY(6px) rotate(2deg); } }
+.capsule-overlay .envelope:not(.open) { animation: envIn .7s cubic-bezier(.2, 1.25, .4, 1) backwards, envWiggle .5s .3s ease-in-out; }
+@keyframes envWiggle { 25% { rotate: -2deg; } 75% { rotate: 2deg; } }
+
+/* ---- Cofre del día: se queda "abierto" al final de la sacudida ---- */
+.chest.opening { animation-fill-mode: forwards; }
+
+/* ---- Juegos: elección ---- */
+.choices .choice { transition: transform .18s cubic-bezier(.3, 1.5, .5, 1), opacity .2s, box-shadow .15s; }
+.choices.picked .choice { pointer-events: none; }
+.choices.picked .choice:not(.chosen) { opacity: .35; transform: scale(.94); }
+.choices.picked .choice.chosen { transform: scale(1.07); box-shadow: 0 0 0 3px var(--primary), 0 4px 0 #e4ddcf; }
+.progress span { transition: background-color .2s, transform .2s; }
+.progress span.on:last-of-type { animation: dotPop .4s cubic-bezier(.2, 1.6, .4, 1); }
+@keyframes dotPop { from { transform: scale(.3); } 60% { transform: scale(1.5); } }
+
+/* ---- Palabra secreta ---- */
+.melt .splash { animation: splashUp .7s cubic-bezier(.2, 1.4, .4, 1) backwards; }
+@keyframes splashUp { from { opacity: 0; transform: translateY(26px) scale(.3); } 60% { transform: translateY(-12px) scale(1.3); } }
+
+/* ---- Pesca ---- */
+.fisher .rod { transform-origin: 8% 87%; }
+.fisher .rod .line { transform-box: fill-box; transform-origin: 50% 0; }
+.fx-wait .rod { animation: rodCast .65s ease-in-out var(--el, 0ms) both; }
+@keyframes rodCast { 0% { transform: rotate(0); } 28% { transform: rotate(-26deg); } 58% { transform: rotate(12deg); } 100% { transform: rotate(0); } }
+.fx-wait .rod .line { animation: lineDrop .5s ease-out calc(var(--el, 0ms) + .3s) backwards; }
+@keyframes lineDrop { from { transform: scaleY(0); opacity: 0; } }
+.fx-wait .bobber.wait { animation: plop .55s cubic-bezier(.2, 1.4, .4, 1) calc(var(--el, 0ms) + .5s) backwards, bob2 1.4s ease-in-out calc(var(--el, 0ms) + 1.05s) infinite; }
+@keyframes plop { from { transform: translateY(-46px) scale(.6); opacity: 0; } 70% { transform: translateY(4px); } }
+.pond::after { content: ""; position: absolute; left: 50%; top: 40%; width: 28px; height: 10px; margin: -5px 0 0 -14px; border-radius: 50%; border: 2px solid rgba(255, 255, 255, .85); opacity: 0; pointer-events: none; }
+.fx-wait .pond::after { animation: ringOut .8s ease-out calc(var(--el, 0ms) + .75s) backwards; }
+@keyframes ringOut { from { transform: scale(.4); opacity: 1; } to { transform: scale(2.6); opacity: 0; } }
+.fx-reel .rod { animation: rodBite .5s ease-out var(--el, 0ms) both; }
+@keyframes rodBite { 0% { transform: rotate(0); } 25% { transform: rotate(9deg) translateY(3px); } 50% { transform: rotate(-5deg); } 75% { transform: rotate(4deg); } 100% { transform: rotate(0); } }
+.bang { position: absolute; left: 50%; top: -40px; margin-left: -10px; width: 22px; text-align: center; font-weight: 900; font-size: 30px; line-height: 1; color: #ff5b5b; text-shadow: 0 2px 0 #fff;
+  animation: bangPop .45s cubic-bezier(.2, 1.7, .4, 1) backwards, bangWob .5s ease-in-out .45s infinite alternate; pointer-events: none; }
+@keyframes bangPop { from { transform: translateY(24px) scale(.2); opacity: 0; } }
+@keyframes bangWob { to { transform: translateY(-4px) rotate(8deg); } }
+.caught { animation: none; }
+.fx-result.catch .caught { animation: fishArc 1s cubic-bezier(.3, .6, .4, 1) var(--el, 0ms) backwards; }
+@keyframes fishArc {
+  0% { transform: translate(-50%, 56px) scale(.4) rotate(-80deg); opacity: 0; }
+  20% { opacity: 1; }
+  45% { transform: translate(-95%, -46px) scale(1.25) rotate(-200deg); }
+  75% { transform: translate(-30%, -30px) scale(1.15) rotate(-330deg); }
+  100% { transform: translate(-50%, 0) scale(1) rotate(-360deg); opacity: 1; }
+}
+.fx-result.catch .pond::after { animation: ringOut .8s ease-out var(--el, 0ms) backwards; }
+.fx-result.miss .pond { animation: pondShake .5s ease-in-out var(--el, 0ms); }
+@keyframes pondShake { 25% { translate: -6px 0; } 50% { translate: 6px 0; } 75% { translate: -3px 0; } }
+.escaped { animation: none; }
+.fx-result.miss .escaped { animation: fade 1s var(--el, 0ms) backwards, escapeUp 1s ease-out var(--el, 0ms) backwards; }
+@keyframes escapeUp { from { transform: translate(10px, 20px) scale(.5); } }
+
+/* ---- Tienda: tarjeta seleccionada ---- */
+.item { transition: transform .18s cubic-bezier(.3, 1.5, .5, 1), border-color .15s; }
+.item.sel { transform: translateY(-4px); }
+.item.sel:active { transform: translateY(-2px) scale(.97); }
+
+/* ---- Preferencia de movimiento reducido: sin nada de lo anterior ---- */
+@media (prefers-reduced-motion: reduce) {
+  #fx-layer { display: none; }
+  main.enter > *, .hug-pop > *, .hug-pop .scene, .toast.bump, .bang, .melt .splash, .progress span.on:last-of-type,
+  .present-overlay .reveal::before, .capsule-overlay .envelope, .fx-wait *, .fx-reel *, .fx-result *, .fx-result .caught, .fx-result .escaped { animation: none !important; }
+  .toast, .toast.show, .item, .choices .choice { transition: none; }
+  .fx-wait .rod, .fx-reel .rod { animation: none !important; }
+  .fx-result.catch .caught { opacity: 1; }
+}
