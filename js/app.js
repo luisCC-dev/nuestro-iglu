@@ -1,7 +1,7 @@
-import { store, dateKey, addDays, dayNumber, achievementMetrics } from './store.js';
+import { store, dateKey, addDays, dayNumber, achievementMetrics, fishAt, catches } from './store.js';
 import { penguin, MOODS, moodById, setStyles } from './penguins.js';
 import { scene, bgSwatch } from './scene.js';
-import { QUESTIONS, THIS_OR_THAT, ROUND_SIZE, HUGS, LIKELY, LIKELY_SIZE, SHOP, SHOP_CATS, itemById, EARN, ACHIEVEMENTS, levelOf, weekChallenges, CHALLENGE_REWARD, LEVELS } from './content.js';
+import { QUESTIONS, THIS_OR_THAT, ROUND_SIZE, HUGS, LIKELY, LIKELY_SIZE, SHOP, SHOP_CATS, itemById, EARN, ACHIEVEMENTS, levelOf, weekChallenges, CHALLENGE_REWARD, LEVELS, FISH, CASTS_PER_DAY } from './content.js';
 
 const root = document.getElementById('app');
 const TABS = [
@@ -523,6 +523,7 @@ function viewGame() {
   if (ui.sub === 'esto') return gameTot();
   if (ui.sub === 'quien') return gameLikely();
   if (ui.sub === 'palabra') return gameWord();
+  if (ui.sub === 'pesca') return gameFish();
   const k = today(), me = ui.me, ot = other(me);
   const g = ui.data.games[k] || {}, l = ui.data.likely[k] || {};
   const pw = partnerWord();
@@ -541,6 +542,7 @@ function viewGame() {
     <div class="games">
       ${card('#juego/esto', '🍕<small>o</small>🍝', 'Esto o aquello', 'Elige y adivina lo que eligió tu pareja.', status(g[me], g[ot]))}
       ${card('#juego/quien', penguin('a', 'emocionado', 44) + penguin('b', 'feliz', 44), '¿Quién es más probable?', 'Votad quién de los dos haría cada cosa.', status(l[me], l[ot]))}
+      ${card('#juego/pesca', '🎣', 'Pesca en el hielo', 'Pulsa en el momento justo y pesca peces para ganar monedas.', fishStatus())}
       ${card('#juego/palabra', '🧊', 'Palabra secreta', 'Pon una palabra y adivina la suya antes de que se derrita el hielo.', wordSt)}
     </div>`;
 }
@@ -585,6 +587,85 @@ function gameLikely() {
   }
   return `${back()}<h1 class="page">¿Quién es más probable?</h1>
     <p class="lead">Vota quién de los dos haría cada cosa. Lo de ${name(ot)} se ve cuando votéis los dos.</p>${body}`;
+}
+
+// ---------- juego: Pesca en el hielo ----------
+const myCasts = () => ui.data.fish?.[today()]?.[ui.me]?.casts || [];
+function fishStatus() {
+  const left = CASTS_PER_DAY - myCasts().length;
+  return left > 0 ? ['todo', `Te quedan ${left} cañas`] : ['ok', 'Vuelve mañana'];
+}
+
+function rodScene(extra = '') {
+  return `<div class="pond-scene">
+    <div class="fisher">${penguin(ui.me, ui.fishing?.phase === 'result' && ui.fishing.ok ? 'feliz' : ui.fishing?.phase === 'result' ? 'triste' : 'emocionado', 78)}
+      <svg class="rod" viewBox="0 0 100 80" aria-hidden="true"><path d="M8 70 Q50 10 92 6" stroke="#8a5a36" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+      <path class="line" d="M92 6 V95" stroke="#1f2a3a" stroke-width="1" opacity=".6"/></svg></div>
+    <div class="pond"><span class="bobber ${ui.fishing?.phase === 'wait' ? 'wait' : ui.fishing?.phase === 'reel' ? 'bite' : ''}"></span>${extra}</div>
+  </div>`;
+}
+
+function gameFish() {
+  const me = ui.me, ot = other(me), casts = myCasts(), left = CASTS_PER_DAY - casts.length;
+  const st = ui.fishing || (ui.fishing = { phase: 'idle' });
+  let play;
+  if (st.phase === 'wait') {
+    play = `${rodScene()}<p class="question center" style="margin:12px 0 0">Esperando a que pique…</p>`;
+  } else if (st.phase === 'reel') {
+    const f = st.fish;
+    play = `${rodScene('<span class="splash-ring"></span>')}
+      <p class="center fish-hint">¡Ha picado algo! ${f.zone <= 0.14 ? '¡Parece grande!' : ''}</p>
+      <div class="meter" aria-hidden="true"><span class="zone" style="left:${(st.zoneStart * 100).toFixed(1)}%;width:${(f.zone * 100).toFixed(1)}%"></span><span class="marker" id="fish-marker"></span></div>
+      <button class="btn big-btn" data-action="fish-pull">¡Tirar!</button>`;
+  } else if (st.phase === 'result') {
+    const f = st.fish;
+    play = `${rodScene(st.ok ? `<span class="caught">${f.emoji}</span>` : '<span class="escaped">💨</span>')}
+      <p class="question center" style="margin:12px 0 2px">${st.ok ? `¡${f.name}! +${f.value} 🪙` : '¡Se escapó!'}</p>
+      <p class="hint center mt0">${st.ok ? (f.value >= 8 ? '¡Una pieza rara! 🎉' : 'Al cubo del iglú.') : `Era un${f.id === 'gamba' ? 'a' : ''} ${f.name.toLowerCase()}…`}</p>
+      ${left > 0 ? `<button class="btn" data-action="fish-cast">🎣 Lanzar otra vez (${left})</button>` : '<p class="hint center">Has usado tus 5 cañas de hoy. ¡Vuelve mañana!</p>'}`;
+  } else {
+    play = `${rodScene()}
+      ${left > 0 ? `<button class="btn" data-action="fish-cast">🎣 Lanzar caña (${left} de ${CASTS_PER_DAY})</button>
+        <p class="hint center">Cuando pique, pulsa <b>¡Tirar!</b> con el marcador en la zona verde. Los peces raros son más difíciles.</p>`
+        : '<p class="hint center">Has usado tus 5 cañas de hoy. ¡Vuelve mañana!</p>'}`;
+  }
+
+  // Acuario: lo que has pescado alguna vez
+  const count = {};
+  for (const [day, e] of Object.entries(ui.data.fish || {})) {
+    for (const i of catches(e[me]?.casts)) { const f = fishAt(day, me, i); count[f.id] = (count[f.id] || 0) + 1; }
+  }
+  const todayCatch = catches(casts).map((i) => fishAt(today(), me, i));
+  const otCatch = catches(ui.data.fish?.[today()]?.[ot]?.casts).length;
+  return `${back()}<h1 class="page">Pesca en el hielo</h1>
+    <p class="lead">Cinco cañas al día. Cuanto más raro el pez, más monedas… y más difícil.</p>
+    <article class="card fish-card">${play}</article>
+    <article class="card">
+      <div class="row space"><h2 class="mt0">Hoy</h2><span class="hint" style="margin:0">${ui.data.fish?.[today()]?.[ot] ? `${name(ot)}: ${otCatch} 🐟` : ''}</span></div>
+      <p class="mt0">${todayCatch.length ? todayCatch.map((f) => f.emoji).join(' ') + ` · +${todayCatch.reduce((n, f) => n + f.value, 0)} 🪙` : 'Aún no has pescado nada hoy.'}</p>
+    </article>
+    <article class="card">
+      <div class="row space"><h2 class="mt0">Tu acuario</h2><span class="hint" style="margin:0">${Object.keys(count).length} de ${FISH.length} especies</span></div>
+      <div class="aquarium">${FISH.map((f) => count[f.id]
+        ? `<div class="aq"><span class="e">${f.emoji}</span><b>${f.name}</b><small>×${count[f.id]} · ${f.value} 🪙</small></div>`
+        : `<div class="aq unk"><span class="e">❔</span><b>???</b><small>${f.value} 🪙</small></div>`).join('')}</div>
+    </article>`;
+}
+
+function startReel() {
+  cancelAnimationFrame(ui.fishRaf);
+  const st = ui.fishing;
+  if (!st || st.phase !== 'reel') return;
+  const tick = (t) => {
+    const m = document.getElementById('fish-marker');
+    if (!m || ui.fishing !== st || st.phase !== 'reel') return;
+    st.t0 ??= t;
+    const cyc = ((t - st.t0) / 1000) * 0.75 * st.fish.speed;
+    st.pos = 1 - Math.abs((cyc % 2) - 1); // va y viene entre 0 y 1
+    m.style.left = `${(st.pos * 100).toFixed(2)}%`;
+    ui.fishRaf = requestAnimationFrame(tick);
+  };
+  ui.fishRaf = requestAnimationFrame(tick);
 }
 
 // ---------- juego: Palabra secreta ----------
@@ -887,6 +968,7 @@ async function render() {
   root.innerHTML = header() + `<main>${fn()}</main>` + tabs(views[view] ? view : 'hoy');
   if (!document.querySelector('.hug-overlay')) checkNewHug();
   if (view === 'nosotros' && store.cloud) fillPush();
+  if (view === 'juego' && ui.sub === 'pesca') startReel();
 }
 
 // ---------- eventos ----------
@@ -968,6 +1050,30 @@ root.addEventListener('click', async (e) => {
       }
     } catch (err) { toast(errText(err)); fillPush(); }
     return;
+  }
+  if (a === 'fish-cast') {
+    const i = myCasts().length;
+    if (i >= CASTS_PER_DAY) return;
+    const fish = fishAt(today(), ui.me, i);
+    const st = ui.fishing = { phase: 'wait', fish, zoneStart: 0.08 + Math.random() * (0.84 - fish.zone) };
+    await render();
+    setTimeout(async () => {
+      if (ui.fishing !== st || location.hash !== '#juego/pesca') return;
+      st.phase = 'reel';
+      await render();
+      if (navigator.vibrate) navigator.vibrate(60);
+    }, 700 + Math.random() * 1500);
+    return;
+  }
+  if (a === 'fish-pull') {
+    const st = ui.fishing;
+    if (!st || st.phase !== 'reel') return;
+    cancelAnimationFrame(ui.fishRaf);
+    const pos = st.pos ?? 0;
+    st.ok = pos >= st.zoneStart && pos <= st.zoneStart + st.fish.zone;
+    st.phase = 'result';
+    try { await store.save('fish', today(), ui.me, { casts: [...myCasts(), st.ok ? 1 : 0] }); }
+    catch (err) { toast(errText(err)); }
   }
   if (a === 'claim') {
     el.disabled = true;
@@ -1073,7 +1179,7 @@ root.addEventListener('change', async (e) => {
   } catch (err) { toast(errText(err)); }
 });
 
-window.addEventListener('hashchange', () => { ui.editMood = false; ui.draftMood = null; ui.lk = null; render(); window.scrollTo(0, 0); });
+window.addEventListener('hashchange', () => { ui.editMood = false; ui.draftMood = null; ui.lk = null; ui.fishing = null; render(); window.scrollTo(0, 0); });
 // Al volver a la app (por ejemplo, tras días en segundo plano) refrescar el día y los datos.
 document.addEventListener('visibilitychange', () => { if (!document.hidden && ui.data) render(); });
 render();

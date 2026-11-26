@@ -2,18 +2,18 @@
 //  - cloud: Supabase (cada uno en su móvil, con cuenta)
 //  - local: localStorage (modo prueba en un solo dispositivo)
 import { SUPABASE_URL, SUPABASE_KEY } from './config.js';
-import { ACHIEVEMENTS, mondayOf, weekChallenges, CHALLENGE_REWARD } from './content.js';
+import { ACHIEVEMENTS, mondayOf, weekChallenges, CHALLENGE_REWARD, fishForRoll, CASTS_PER_DAY } from './content.js';
 
 // Modo demo: datos de ejemplo en este dispositivo, sin cuenta (?demo o botón "Ver demo").
 const DEMO = sessionStorage.getItem('iglu-demo') === '1';
 const CLOUD = !!SUPABASE_KEY && !DEMO;
-const SECTION = { answer: 'answers', mood: 'moods', game: 'games', hug: 'hugs', likely: 'likely', word: 'words', wordplay: 'wordplays', gift: 'gifts' };
+const SECTION = { answer: 'answers', mood: 'moods', game: 'games', hug: 'hugs', likely: 'likely', word: 'words', wordplay: 'wordplays', gift: 'gifts', fish: 'fish' };
 let sb = null;
 let member = null; // { slot, couple_id, name } en modo cloud
 
 // ---------- modo local ----------
 const KEY = DEMO ? 'iglu-demo-v1' : 'iglu-data-v1', ME_KEY = DEMO ? 'iglu-demo-me' : 'iglu-me';
-const empty = () => ({ names: null, answers: {}, moods: {}, games: {}, hugs: {}, likely: {}, words: {}, wordplays: {}, gifts: {}, claims: [], styles: { a: {}, b: {} }, bg: null, owned: { a: [], b: [] } });
+const empty = () => ({ names: null, answers: {}, moods: {}, games: {}, hugs: {}, likely: {}, words: {}, wordplays: {}, gifts: {}, fish: {}, claims: [], styles: { a: {}, b: {} }, bg: null, owned: { a: [], b: [] } });
 function loadLocal() { try { return { ...empty(), ...JSON.parse(localStorage.getItem(KEY)) }; } catch { return empty(); } }
 function putLocal(kind, date, who, value) {
   const d = loadLocal(), s = SECTION[kind];
@@ -92,6 +92,8 @@ export const store = {
   async saveGame(date, who, picks, guesses) { CLOUD ? await putCloud('game', date, { picks, guesses }) : putLocal('game', date, who, { picks, guesses }); },
   async reset() { localStorage.removeItem(KEY); localStorage.removeItem(ME_KEY); },
 
+  // Semilla de la pareja para la pesca (en la nube, el id de la pareja; en local, fija).
+  coupleSeed() { return CLOUD ? member?.couple_id || '' : DEMO ? 'demo' : 'local'; },
   getMe() { return CLOUD ? member?.slot || 'a' : localStorage.getItem(ME_KEY) || 'a'; },
   setMe(who) { if (!CLOUD) localStorage.setItem(ME_KEY, who); },
 
@@ -173,6 +175,7 @@ export function coinsEarned(d, slot) {
   for (const e of Object.values(d.wordplays || {})) { const r = e[slot]?.result; n += r === 'win' ? 10 : r === 'lose' ? 3 : 0; }
   for (const e of Object.values(d.hugs || {})) if (e[slot]) n += Math.min((e[slot].items || []).length, 3);
   for (const [day, e] of Object.entries(d.gifts || {})) if (e[slot]) n += giftLocal(day, slot);
+  for (const [day, e] of Object.entries(d.fish || {})) if (e[slot]) n += catches(e[slot].casts).reduce((t, i) => t + fishAt(day, slot, i).value, 0);
   return n + achievementBonus(achievementMetrics(d, slot)) + CHALLENGE_REWARD * (d.claims || []).length;
 }
 
@@ -186,6 +189,7 @@ export function coupleXp(d) {
     n += has('answers') * 10 + has('moods') * 5 + has('games') * 5 + has('likely') * 5 + has('words') * 3;
     n += Object.values(d.wordplays || {}).filter((e) => e[slot]?.result).length * 5;
     n += Object.values(d.hugs || {}).reduce((t, e) => t + Math.min(e[slot]?.items?.length || 0, 3), 0);
+    n += Object.values(d.fish || {}).reduce((t, e) => t + 2 * catches(e[slot]?.casts).length, 0);
   }
   return n + 10 * bothDays('answers', d) + 30 * (d.claims || []).length;
 }
@@ -200,6 +204,11 @@ export function weekMetrics(d, monday) {
     gifts: cnt('gifts'), answers: cnt('answers'),
   };
 }
+// ---- Pesca: la especie de cada tirada sale del mismo hash que str_hash en la BD ----
+export function strHash(t) { let h = 7; for (const c of t) h = (h * 31 + c.charCodeAt(0)) % 100003; return h; }
+export const fishAt = (day, slot, i) => fishForRoll(strHash(`${store.coupleSeed()}${day}${slot}${i}`) % 100);
+export const catches = (casts = []) => casts.slice(0, CASTS_PER_DAY).map((v, i) => (v ? i : -1)).filter((i) => i >= 0);
+
 // Solo modo local/demo: en la nube el cofre lo calcula la BD (gift_amount).
 function giftLocal(day, slot) { let h = 7; for (const c of day + slot) h = (h * 31 + c.charCodeAt(0)) % 100003; return 3 + (h % 8); }
 
@@ -218,6 +227,7 @@ export function achievementMetrics(d, slot) {
     hugs: Object.values(d.hugs || {}).reduce((n, e) => n + (e[slot]?.items?.length || 0), 0),
     wins: Object.values(d.wordplays || {}).filter((e) => e[slot]?.result === 'win').length,
     buys: (d.owned?.[slot] || []).length, streak,
+    fish: Object.values(d.fish || {}).reduce((n, e) => n + catches(e[slot]?.casts).length, 0),
   };
 }
 export const achievementBonus = (m) => ACHIEVEMENTS.reduce((n, a) => n + (m[a.metric] >= a.goal ? a.reward : 0), 0);

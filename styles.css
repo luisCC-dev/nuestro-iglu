@@ -334,3 +334,32 @@ main { animation: fadeUp .25s ease-out; }
 .ch-rew small { display: block; font-size: 11px; color: var(--muted); }
 .ch-ok { font-weight: 900; color: #2f7d50; font-size: 13px; }
 .ch .btn.small { padding: 0 12px; font-size: 13px; }
+
+/* ---------- v9: pesca ---------- */
+.fish-card { overflow: hidden; }
+.pond-scene { position: relative; height: 170px; border-radius: 18px; background: linear-gradient(180deg, #cfe9ff 0%, #eef7ff 55%, #ffffff 56%, #e6f2fc 100%); margin-bottom: 12px; overflow: hidden; }
+.fisher { position: absolute; left: 14px; bottom: 26px; }
+.fisher .rod { position: absolute; left: 52px; top: -30px; width: 160px; height: 128px; }
+.pond { position: absolute; right: 34px; bottom: 22px; width: 130px; height: 44px; border-radius: 50%; background: radial-gradient(ellipse at 50% 40%, #4f9de6 0%, #2f6fb0 70%, #234f86 100%); box-shadow: inset 0 4px 8px rgba(0,0,0,.25), 0 0 0 5px #fff; }
+.bobber { position: absolute; left: 50%; top: 40%; width: 12px; height: 12px; margin-left: -6px; border-radius: 50%; background: linear-gradient(180deg, #ff5b5b 50%, #fff 50%); box-shadow: 0 1px 2px rgba(0,0,0,.3); }
+.bobber.wait { animation: bob2 1.4s ease-in-out infinite; }
+.bobber.bite { animation: bite .35s ease-in-out infinite; }
+@keyframes bob2 { 50% { transform: translateY(3px); } }
+@keyframes bite { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(7px); } }
+.splash-ring { position: absolute; left: 50%; top: 45%; width: 30px; height: 12px; margin: -6px 0 0 -15px; border-radius: 50%; border: 2px solid rgba(255,255,255,.8); animation: ring 0.9s ease-out infinite; }
+@keyframes ring { from { transform: scale(.5); opacity: 1; } to { transform: scale(2.2); opacity: 0; } }
+.caught { position: absolute; left: 50%; top: -30px; font-size: 40px; transform: translateX(-50%); animation: jumpOut .7s cubic-bezier(.2,1.4,.4,1); }
+@keyframes jumpOut { from { top: 20px; opacity: 0; } to { top: -30px; opacity: 1; } }
+.escaped { position: absolute; left: 60%; top: -8px; font-size: 26px; animation: fade 1s; }
+.fish-hint { font-weight: 800; color: var(--navy); margin: 0 0 8px; }
+.meter { position: relative; height: 34px; border-radius: 999px; background: #e9eef5; box-shadow: inset 0 2px 4px rgba(31,42,58,.12); overflow: hidden; }
+.meter .zone { position: absolute; top: 0; bottom: 0; background: linear-gradient(180deg, #7be07b, #4fb86a); }
+.meter .marker { position: absolute; top: 3px; bottom: 3px; width: 6px; margin-left: -3px; border-radius: 3px; background: var(--ink); box-shadow: 0 0 0 2px #fff; }
+.big-btn { min-height: 60px; font-size: 22px; }
+.aquarium { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 8px; }
+.aq { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 10px 4px; border-radius: 16px; background: #e3f0ff; text-align: center; }
+.aq .e { font-size: 30px; }
+.aq b { font-size: 12px; }
+.aq small { font-size: 11px; color: var(--muted); font-weight: 700; }
+.aq.unk { background: var(--soft); opacity: .7; }
+@media (prefers-reduced-motion: reduce) { .bobber, .splash-ring, .caught { animation: none !important; } }

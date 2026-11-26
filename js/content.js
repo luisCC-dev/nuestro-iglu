@@ -162,6 +162,7 @@ export const EARN = [
   ['Adivinar una palabra (perder da +3)', '+10'],
   ['Mandar mimos (máx. 3 al día)', '+1'],
   ['Abrir el cofre del día', '+3 a +10'],
+  ['Pescar en el hielo (5 cañas al día)', '+2 a +15'],
   ['Conseguir logros (en Nosotros)', 'hasta +100'],
 ];
 
@@ -177,6 +178,7 @@ export const ACHIEVEMENTS = [
   { id: 'racha7', emoji: '🔥', name: 'Racha de 7', desc: '7 días seguidos respondiendo los dos', metric: 'streak', goal: 7, reward: 40 },
   { id: 'racha30', emoji: '💎', name: 'Racha de 30', desc: '30 días seguidos respondiendo los dos', metric: 'streak', goal: 30, reward: 100 },
   { id: 'coleccion', emoji: '🛍️', name: 'Coleccionista', desc: 'Compra 5 objetos en la tienda', metric: 'buys', goal: 5, reward: 25 },
+  { id: 'pescador', emoji: '🎣', name: 'Pescador', desc: 'Pesca 25 peces', metric: 'fish', goal: 25, reward: 30 },
 ];
 
 // Retos semanales (mismo orden y metas que challenge_goal en 008_nivel_retos.sql)
@@ -221,3 +223,15 @@ export function weekChallenges(monday) {
   const w = Math.floor((Date.parse(monday + 'T00:00:00Z') - Date.parse('2024-01-01T00:00:00Z')) / 86400000 / 7);
   return [0, 1, 2].map((i) => ({ idx: i, ...CHALLENGES[(w * 3 + i) % CHALLENGES.length] }));
 }
+
+// Pesca: especies por tirada (0..99), igual que fish_value en 009_pesca.sql
+export const FISH = [
+  { id: 'sardina', name: 'Sardina', emoji: '🐟', max: 45, value: 2, zone: 0.30, speed: 1.0 },
+  { id: 'gamba', name: 'Gamba', emoji: '🦐', max: 70, value: 3, zone: 0.26, speed: 1.15 },
+  { id: 'calamar', name: 'Calamar', emoji: '🦑', max: 85, value: 4, zone: 0.22, speed: 1.3 },
+  { id: 'colores', name: 'Pez de colores', emoji: '🐠', max: 94, value: 6, zone: 0.17, speed: 1.5 },
+  { id: 'globo', name: 'Pez globo', emoji: '🐡', max: 99, value: 8, zone: 0.14, speed: 1.7 },
+  { id: 'dorado', name: 'Pez dorado', emoji: '🌟', max: 100, value: 15, zone: 0.10, speed: 2.0 },
+];
+export const CASTS_PER_DAY = 5;
+export const fishForRoll = (r) => FISH.find((f) => r < f.max);
