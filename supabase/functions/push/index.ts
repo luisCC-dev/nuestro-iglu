@@ -72,6 +72,11 @@ async function onEvent(b: { couple_id: string; kind: string; day: string; slot: 
       if (!d.result) return 0;
       title = d.result === "win" ? `${who} adivinó tu palabra 🎉` : `${who} se cayó al agua 💦`;
       body = d.result === "win" ? "¡Salvó a su pingüino!" : "No adivinó tu palabra secreta."; break;
+    case "draw": title = `${who} te ha dejado un dibujo ✏️`; body = "¿Adivinas qué es?"; break;
+    case "drawguess":
+      if (!d.result) return 0;
+      title = d.result === "win" ? `${who} adivinó tu dibujo 🎨` : `${who} no adivinó tu dibujo`;
+      body = d.result === "win" ? "+5 monedas extra para ti." : "Mira qué dijo en Dibuja y adivina."; break;
     case "hug": {
       const last = (d.items || []).at(-1);
       if (!last || Date.now() - last.at > 120_000) return 0;
