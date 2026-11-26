@@ -61,14 +61,40 @@ const IGLOO = `<svg class="igloo" viewBox="0 0 120 82" aria-hidden="true">
   <ellipse cx="60" cy="74" rx="11" ry="3.5" fill="var(--ig-glow)" opacity=".85"/>
 </svg>`;
 
-export function scene({ bg = null, night = false, duo = '', top = '', cls = '' } = {}) {
+// Mejoras del iglú según el nivel de la pareja (cada nivel suma lo anterior).
+function levelExtras(lv) {
+  const out = [];
+  if (lv >= 2) out.push(`<g class="lv-chimney"><rect x="82" y="4" width="11" height="16" rx="2" fill="var(--ig-b)" stroke="var(--ig-l)" stroke-width="1.5"/>
+    <circle class="smoke s1" cx="88" cy="-2" r="4" fill="#fff" opacity=".7"/><circle class="smoke s2" cx="90" cy="-8" r="5" fill="#fff" opacity=".5"/></g>`);
+  if (lv >= 3) out.push(`<g class="lv-flag"><path d="M60 7 V-22" stroke="#8a6a4a" stroke-width="2.2" stroke-linecap="round"/>
+    <path class="flag" d="M61 -22 L80 -16 L61 -10 Z" fill="#ff7a59"/></g>`);
+  if (lv >= 4) {
+    const pts = [[14, 50], [22, 34], [34, 21], [48, 12], [60, 10], [72, 12], [86, 21], [98, 34], [106, 50]];
+    const cols = ['#ff5b84', '#ffd166', '#5ec2ff', '#7be07b'];
+    out.push(`<g class="lv-lights"><path d="M14 50 Q24 26 60 10 Q96 26 106 50" stroke="#3b3f58" stroke-width="1" fill="none" opacity=".6"/>
+      ${pts.map(([x, y], i) => `<circle class="bulb" cx="${x}" cy="${y}" r="2.6" fill="${cols[i % 4]}" style="animation-delay:${(i * 0.25).toFixed(2)}s"/>`).join('')}</g>`);
+  }
+  if (lv >= 5) out.push(`<g class="lv-snowman" transform="translate(122 46)"><circle cx="0" cy="22" r="11" fill="#fff" stroke="#d6e6f5"/><circle cx="0" cy="5" r="8" fill="#fff" stroke="#d6e6f5"/>
+    <circle cx="-3" cy="3" r="1.2" fill="#1f2a3a"/><circle cx="3" cy="3" r="1.2" fill="#1f2a3a"/><path d="M0 6 l6 1.5 l-6 1z" fill="#ff8a3d"/>
+    <path d="M-7 10 h14" stroke="#5ec2ff" stroke-width="3" stroke-linecap="round"/><rect x="-6" y="-7" width="12" height="6" rx="1" fill="#26262e"/><rect x="-8" y="-2" width="16" height="2" fill="#26262e"/></g>`);
+  if (lv >= 6) out.push(`<g class="lv-lantern" transform="translate(26 58)"><path d="M0 -6 V0" stroke="#5a4a3a" stroke-width="1.5"/><rect x="-4" y="0" width="8" height="10" rx="2" fill="#ffd166" stroke="#a07a3a"/>
+    <circle class="glow" cx="0" cy="5" r="9" fill="#ffd166" opacity=".35"/></g>`);
+  if (lv >= 7) out.push(`<g class="lv-fish" transform="translate(-6 80)"><ellipse cx="0" cy="0" rx="12" ry="3.5" fill="var(--sea, #4f9de6)" stroke="var(--ig-l)" stroke-width="1"/>
+    <path class="fish" d="M-4 -6 q6 -6 10 0 q-4 5 -10 0 z M6 -6 l4 -3 v6 z" fill="#ff9d5c"/></g>`);
+  if (lv >= 8) out.push(`<g class="lv-window"><circle cx="36" cy="38" r="6" fill="#ffd98a" stroke="var(--ig-l)" stroke-width="1.5"/><path d="M36 32 V44 M30 38 H42" stroke="var(--ig-l)" stroke-width="1"/></g>`);
+  if (lv >= 9) out.push(`<path class="lv-heart" d="M60 38 l-7 -7 a4 4 0 0 1 7 -5 a4 4 0 0 1 7 5 z" fill="#ff8fb0" stroke="#fff" stroke-width="1"/>`);
+  if (lv >= 10) out.push(`<g class="lv-star" transform="translate(60 ${lv >= 3 ? -27 : 2})"><path d="M0 -8 l2.4 5 5.4 .6 -4 3.7 1.1 5.3 -4.9 -2.8 -4.9 2.8 1.1 -5.3 -4 -3.7 5.4 -.6z" fill="#ffcf40" stroke="#e0a800" stroke-width="1"/></g>`);
+  return out.join('');
+}
+
+export function scene({ bg = null, night = false, duo = '', top = '', cls = '', level = 1 } = {}) {
   const key = bg ? bg.split(':')[1] : night ? 'night' : 'day';
   const bgCls = bg ? 'bg-' + key : night ? 'night' : '';
   const dec = (DECOR[key] || DECOR.day)();
   return `<section class="hero ${cls} ${bgCls}">
     <div class="sky" aria-hidden="true">${dec}<span class="sea"></span></div>
     ${top}
-    <div class="floe">${IGLOO}<div class="duo">${duo}</div><div class="ice"></div></div>
+    <div class="floe">${IGLOO.replace('</svg>', levelExtras(level) + '</svg>')}<div class="duo">${duo}</div><div class="ice"></div></div>
   </section>`;
 }
 

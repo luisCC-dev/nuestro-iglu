@@ -178,3 +178,46 @@ export const ACHIEVEMENTS = [
   { id: 'racha30', emoji: '💎', name: 'Racha de 30', desc: '30 días seguidos respondiendo los dos', metric: 'streak', goal: 30, reward: 100 },
   { id: 'coleccion', emoji: '🛍️', name: 'Coleccionista', desc: 'Compra 5 objetos en la tienda', metric: 'buys', goal: 5, reward: 25 },
 ];
+
+// Retos semanales (mismo orden y metas que challenge_goal en 008_nivel_retos.sql)
+export const CHALLENGES = [
+  { metric: 'both_answers', goal: 5, emoji: '💬', text: 'Responded los dos la pregunta 5 días' },
+  { metric: 'moods_both', goal: 4, emoji: '📔', text: 'Escribid los dos vuestro día 4 días' },
+  { metric: 'hugs', goal: 10, emoji: '🤗', text: 'Mandaos 10 mimos entre los dos' },
+  { metric: 'games', goal: 6, emoji: '🎲', text: 'Jugad 6 partidas entre los dos' },
+  { metric: 'words', goal: 2, emoji: '🧊', text: 'Adivinad 2 palabras secretas' },
+  { metric: 'gifts', goal: 8, emoji: '🎁', text: 'Abrid 8 cofres entre los dos' },
+  { metric: 'answers', goal: 10, emoji: '✍️', text: 'Sumad 10 respuestas entre los dos' },
+];
+export const CHALLENGE_REWARD = 20; // monedas para cada uno (y +30 puntos de iglú)
+
+// Niveles del iglú: puntos necesarios y lo que se desbloquea en la escena
+export const LEVELS = [
+  { xp: 0, name: 'Iglú recién hecho', unlock: '' },
+  { xp: 100, name: 'Iglú con chimenea', unlock: 'Chimenea con humo' },
+  { xp: 250, name: 'Iglú con bandera', unlock: 'Bandera en lo alto' },
+  { xp: 450, name: 'Iglú de fiesta', unlock: 'Guirnalda de luces' },
+  { xp: 700, name: 'Iglú con amigo', unlock: 'Muñeco de nieve' },
+  { xp: 1000, name: 'Iglú acogedor', unlock: 'Farolillo junto a la puerta' },
+  { xp: 1400, name: 'Iglú pescador', unlock: 'Agujero de pesca con pez' },
+  { xp: 1900, name: 'Iglú con ventana', unlock: 'Ventana iluminada' },
+  { xp: 2500, name: 'Iglú enamorado', unlock: 'Corazón de hielo' },
+  { xp: 3200, name: 'Iglú legendario', unlock: 'Estrella dorada' },
+];
+export function levelOf(xp) {
+  let i = 0;
+  while (i + 1 < LEVELS.length && xp >= LEVELS[i + 1].xp) i++;
+  return { level: i + 1, ...LEVELS[i], next: LEVELS[i + 1] || null };
+}
+// Lunes de la semana (hora local) y número de semana como en la BD
+export function mondayOf(key) {
+  const [y, m, d] = key.split('-').map(Number);
+  const dt = new Date(y, m - 1, d), dow = (dt.getDay() + 6) % 7;
+  dt.setDate(dt.getDate() - dow);
+  const p = (n) => String(n).padStart(2, '0');
+  return `${dt.getFullYear()}-${p(dt.getMonth() + 1)}-${p(dt.getDate())}`;
+}
+export function weekChallenges(monday) {
+  const w = Math.floor((Date.parse(monday + 'T00:00:00Z') - Date.parse('2024-01-01T00:00:00Z')) / 86400000 / 7);
+  return [0, 1, 2].map((i) => ({ idx: i, ...CHALLENGES[(w * 3 + i) % CHALLENGES.length] }));
+}

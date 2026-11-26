@@ -1,7 +1,7 @@
 import { store, dateKey, addDays, dayNumber, achievementMetrics } from './store.js';
 import { penguin, MOODS, moodById, setStyles } from './penguins.js';
 import { scene, bgSwatch } from './scene.js';
-import { QUESTIONS, THIS_OR_THAT, ROUND_SIZE, HUGS, LIKELY, LIKELY_SIZE, SHOP, SHOP_CATS, itemById, EARN, ACHIEVEMENTS } from './content.js';
+import { QUESTIONS, THIS_OR_THAT, ROUND_SIZE, HUGS, LIKELY, LIKELY_SIZE, SHOP, SHOP_CATS, itemById, EARN, ACHIEVEMENTS, levelOf, weekChallenges, CHALLENGE_REWARD, LEVELS } from './content.js';
 
 const root = document.getElementById('app');
 const TABS = [
@@ -161,9 +161,10 @@ function greeting() {
 function hero() {
   const k = today(), m = ui.data.moods[k] || {}, s = streak();
   const hr = new Date().getHours(), night = hr >= 21 || hr < 6;
+  const lv = levelOf(ui.data.xp || 0).level;
   return scene({
-    bg: ui.data.bg, night,
-    top: `<div class="hero-text">
+    bg: ui.data.bg, night, level: lv,
+    top: `<a class="lvl-badge" href="#nosotros" aria-label="Nivel ${lv} del iglú">⭐ Nivel ${lv}</a><div class="hero-text">
       <p class="hello">${greeting()}, ${name(ui.me)}</p>
       <p class="date">${cap(fmtDate(k))}</p>
       <span class="streak-chip">🔥 ${s} ${s === 1 ? 'día' : 'días'} de racha</span>
@@ -252,6 +253,42 @@ function giftCard() {
     <button class="chest" data-action="gift" aria-label="Abrir el cofre del día"><span class="lid">🎁</span></button>
     <div><h2 class="mt0">Cofre del día</h2><p class="hint mt0">Ábrelo para ganar entre 3 y 10 monedas. ¡Uno cada día!</p></div>
   </article>`;
+}
+
+function iglooCard() {
+  const xp = ui.data.xp || 0, L = levelOf(xp);
+  const pct = L.next ? Math.round(((xp - L.xp) / (L.next.xp - L.xp)) * 100) : 100;
+  const wk = ui.data.week || { metrics: {}, claims: [] };
+  const list = weekChallenges(wk.monday || today());
+  const endDay = addDays(wk.monday || today(), 6);
+  const daysLeft = Math.max(0, Math.round((Date.parse(endDay + 'T12:00:00') - Date.parse(today() + 'T12:00:00')) / 86400000));
+  return `<article class="card igloo-card">
+    <div class="row space"><h2 class="mt0">⭐ Nivel ${L.level} · ${L.name}</h2></div>
+    <div class="bar big"><i style="width:${pct}%"></i></div>
+    <p class="hint">${L.next ? `${xp} / ${L.next.xp} puntos · siguiente: <b>${L.next.unlock}</b>` : `${xp} puntos · ¡nivel máximo!`}</p>
+    <details class="levels"><summary>Ver todas las mejoras del iglú</summary>
+      ${LEVELS.map((l, i) => `<div class="lv-row ${i + 1 <= L.level ? 'ok' : ''}"><span>Nivel ${i + 1}</span><b>${i === 0 ? 'Iglú básico' : l.unlock}</b><small>${l.xp} pts</small></div>`).join('')}
+    </details>
+    <h3 class="sub" style="margin-top:14px">🎯 Retos de la semana <small class="hint">(${daysLeft === 0 ? 'último día' : `quedan ${daysLeft} días`})</small></h3>
+    ${list.map((c) => {
+      const v = Math.min(wk.metrics[c.metric] || 0, c.goal), done = v >= c.goal, claimed = wk.claims.includes(c.idx);
+      return `<div class="ch ${claimed ? 'claimed' : done ? 'done' : ''}">
+        <span class="ch-ico">${c.emoji}</span>
+        <div class="ch-txt"><b>${c.text}</b><div class="bar"><i style="width:${Math.round((v / c.goal) * 100)}%"></i></div><small>${v} / ${c.goal}</small></div>
+        ${claimed ? '<span class="ch-ok">✓ Hecho</span>'
+          : done ? `<button class="btn small" data-action="claim" data-idx="${c.idx}">Cobrar +${CHALLENGE_REWARD} 🪙</button>`
+          : `<span class="ch-rew">+${CHALLENGE_REWARD} 🪙<small>cada uno</small></span>`}
+      </div>`;
+    }).join('')}
+    <p class="hint">Cada reto da ${CHALLENGE_REWARD} 🪙 a cada uno y +30 puntos al iglú. Los puntos salen de todo lo que hacéis.</p>
+  </article>`;
+}
+
+function checkLevel() {
+  const key = `iglu-lvl-${store.demo ? 'demo' : 'cloud'}`;
+  const lv = levelOf(ui.data.xp || 0).level, before = Number(localStorage.getItem(key) || 0);
+  localStorage.setItem(key, String(lv));
+  if (before && lv > before) setTimeout(() => toast(`⭐ ¡Vuestro iglú sube a nivel ${lv}! Nueva mejora: ${LEVELS[lv - 1].unlock}`), 1600);
 }
 
 function achievementsCard() {
@@ -362,7 +399,7 @@ function viewDiary() {
   return `<h1 class="page">Nuestro diario</h1>
     <p class="lead">Cómo os habéis sentido cada día.</p>
     ${scene({
-      bg: ui.data.bg, night: hr >= 21 || hr < 6, cls: 'stage diary-scene',
+      bg: ui.data.bg, night: hr >= 21 || hr < 6, cls: 'stage diary-scene', level: levelOf(ui.data.xp || 0).level,
       top: `<div class="mood-tags">${['a', 'b'].map((w) => `<span class="mood-tag" style="${moodOf(w) ? `background:${moodById(moodOf(w)).color}` : ''}">${w === me ? 'Tú' : name(w)}: ${label(w) || '…'}</span>`).join('')}</div>`,
       duo: penguin('a', moodOf('a'), 84, 'bob') + penguin('b', moodOf('b'), 84, 'bob delay'),
     })}
@@ -660,6 +697,7 @@ function viewUs() {
 
   return `<h1 class="page">Nosotros</h1>
     <p class="lead">Lo activos que estáis y cómo os sentís.</p>
+    ${iglooCard()}
     <article class="card">
       <div class="streak">${penguin('a', s ? 'feliz' : null, 64)}<div><span class="num">${s}</span><div class="label" style="margin:0">${s === 1 ? 'día' : 'días'} de racha</div></div>${penguin('b', s ? 'amor' : null, 64)}</div>
       <p class="hint center">La racha sube cada día que respondéis los dos la pregunta.</p>
@@ -736,7 +774,7 @@ function viewShop() {
 
   return `<h1 class="page">Tienda</h1>
     <p class="lead">Viste a tu pingüino y decorad vuestro iglú.${cat === 'bg' ? ' El fondo lo veis los dos.' : ''}</p>
-    ${scene({ bg: bgId, cls: 'stage', top: `<span class="wallet">🪙 ${ui.data.wallet}</span>`,
+    ${scene({ bg: bgId, cls: 'stage', level: levelOf(ui.data.xp || 0).level, top: `<span class="wallet">🪙 ${ui.data.wallet}</span>`,
       duo: penguin(me, 'feliz', 92, 'bob', preview) + penguin(ot, 'amor', 72, 'bob delay') })}
     <div class="shop-action">${action}</div>
     <div class="cats" role="tablist">${SHOP_CATS.map(([id, label, e]) =>
@@ -819,6 +857,8 @@ const ERRORS = {
   'not enough coins': 'No tienes monedas suficientes.',
   'already owned': 'Ya lo tienes.',
   'not owned': 'Primero tienes que comprarlo.',
+  'not done': 'Ese reto aún no está completo.',
+  'bad week': 'Ese reto ya ha caducado.',
 };
 const errText = (err) => {
   const m = err?.message || String(err);
@@ -837,6 +877,7 @@ async function render() {
   if (ui.lastWallet != null && ui.data.wallet > ui.lastWallet && !ui.spending) coinPop(ui.data.wallet - ui.lastWallet);
   ui.lastWallet = ui.data.wallet; ui.spending = false;
   checkAchievements();
+  checkLevel();
   if (!ui.data.names) { root.innerHTML = viewSetup(); return; }
   if (store.cloud && !subscribed) { subscribed = true; store.onRemoteChange(() => { if (!document.activeElement?.matches('textarea, input')) render(); }); }
   const [view, sub] = (location.hash.slice(1) || 'hoy').split('/');
@@ -927,6 +968,11 @@ root.addEventListener('click', async (e) => {
       }
     } catch (err) { toast(errText(err)); fillPush(); }
     return;
+  }
+  if (a === 'claim') {
+    el.disabled = true;
+    try { await store.claimChallenge(ui.data.week.monday, Number(el.dataset.idx)); toast(`🎯 ¡Reto cumplido! +${CHALLENGE_REWARD} 🪙 para cada uno`); }
+    catch (err) { toast(errText(err)); el.disabled = false; return; }
   }
   if (a === 'gift') {
     if (ui.opening) return;

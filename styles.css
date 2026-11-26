@@ -314,3 +314,23 @@ main { animation: fadeUp .25s ease-out; }
 @media (prefers-reduced-motion: reduce) { .chest { animation: none; } }
 .mood-tags { position: relative; z-index: 3; display: flex; gap: 6px; flex-wrap: wrap; }
 .mood-tag { background: rgba(255,255,255,.9); border-radius: 999px; padding: 5px 11px; font-size: 13px; font-weight: 800; color: var(--ink); box-shadow: 0 2px 0 rgba(31,42,58,.08); }
+
+/* ---------- v8: nivel del iglú y retos ---------- */
+.igloo-card { background: linear-gradient(160deg, #fffdf8, #eef6ff); }
+.bar.big { height: 12px; margin-top: 4px; }
+.bar.big i { background: linear-gradient(90deg, #ffcf40, #ff7a59); }
+.levels summary { cursor: pointer; font-weight: 800; font-size: 14px; color: var(--navy); }
+.lv-row { display: grid; grid-template-columns: 70px 1fr auto; gap: 8px; padding: 6px 0; border-top: 1px solid var(--line); font-size: 13px; color: var(--muted); }
+.lv-row.ok { color: var(--ink); }
+.lv-row.ok span::before { content: '✓ '; color: #2f7d50; }
+.sub small { font-weight: 700; }
+.ch { display: grid; grid-template-columns: 34px 1fr auto; gap: 10px; align-items: center; padding: 10px; border-radius: 16px; background: var(--soft); margin-top: 8px; }
+.ch.done { background: #fff3c4; }
+.ch.claimed { background: #dff3e6; }
+.ch-ico { font-size: 24px; text-align: center; }
+.ch-txt b { display: block; font-size: 14px; line-height: 1.2; }
+.ch-txt small { font-size: 12px; color: var(--muted); font-weight: 700; }
+.ch-rew { text-align: right; font-weight: 900; font-size: 13px; }
+.ch-rew small { display: block; font-size: 11px; color: var(--muted); }
+.ch-ok { font-weight: 900; color: #2f7d50; font-size: 13px; }
+.ch .btn.small { padding: 0 12px; font-size: 13px; }
